@@ -101,7 +101,6 @@ app.delete('/presupuesto/:id', (req, res) => {
 });
 
 // PDF CON CORRECCIÓN DE RUTA DE IMAGEN PARA EXE
-// PDF CON CORRECCIÓN DE RUTA PARA PRODUCCIÓN (.EXE)
 app.get('/presupuesto/:id/pdf', (req, res) => {
     db.get("SELECT * FROM presupuestos WHERE id = ?", [req.params.id], (err, p) => {
         if (err || !p) return res.status(404).send("Error: El presupuesto no existe.");
@@ -111,8 +110,17 @@ app.get('/presupuesto/:id/pdf', (req, res) => {
             res.setHeader('Content-Type', 'application/pdf');
             doc.pipe(res);
 
-            // DETECCIÓN DE RUTA DE LOGO (Funciona en VS Code y en el .EXE)
-            const logoPath = path.join(__dirname, 'NLOGO.png');
+            // CORRECCIÓN DE RUTA: Detectar si corre desde el .EXE o desde VS Code
+            const isProd = process.mainModule && process.mainModule.filename.includes('app.asar') || process.resourcesPath;
+            
+            let logoPath;
+            if (process.env.NODE_ENV === 'development' || !process.resourcesPath) {
+                // Modo VS Code
+                logoPath = path.join(__dirname, 'NLOGO.png');
+            } else {
+                // Modo Instalado (.EXE) - Los extraResources van a la carpeta 'resources'
+                logoPath = path.join(process.resourcesPath, 'NLOGO.png');
+            }
 
             // CABECERA
             doc.save();
@@ -127,14 +135,14 @@ app.get('/presupuesto/:id/pdf', (req, res) => {
                     doc.save().fillOpacity(0.2);
                     doc.image(logoPath, 280, 450, { width: 340 });
                     doc.restore();
-                } catch (e) {}
+                } catch (e) { console.error("Error watermark:", e); }
             }
 
             // LOGO SUPERIOR
             if (fs.existsSync(logoPath)) {
                 try {
                     doc.image(logoPath, 0, 0, { width: 160 });
-                } catch (e) {}
+                } catch (e) { console.error("Error top logo:", e); }
             }
             
             doc.fillColor('white').fontSize(8).font('Helvetica-Bold')
@@ -142,7 +150,6 @@ app.get('/presupuesto/:id/pdf', (req, res) => {
                .text("RIF: J-506865270", 170, 47)
                .text("TELF: +58 4129669616", 170, 59);
 
-            // ... (Resto del código del PDF igual que antes)
             doc.fillColor('#1A1A1A').fontSize(14).font('Helvetica-Bold').text("COTIZACIÓN", 400, 35, { align: 'right' });
             doc.fontSize(10).text(p.numero || 'S/N', 400, 52, { align: 'right' });
             doc.fontSize(8).font('Helvetica').text(`Fecha: ${p.fecha || ''}`, 400, 65, { align: 'right' });

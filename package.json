@@ -43,8 +43,7 @@
       "shortcutName": "AB Technology"
     },
     "files": [
-      "**/*",
-      "NLOGO.png"
+      "**/*"
     ],
     "extraResources": [
       "NLOGO.png"
