@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Administrativo - AB TECHNOLOGY BY</title>
+    <style>
+        :root { --primary: #FFC107; --dark: #1A1A1A; --bg: #F8F9FA; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
+        .header-ui { display: flex; justify-content: space-between; align-items: center; border-bottom: 5px solid var(--dark); padding-bottom: 15px; margin-bottom: 25px; }
+        .logo-box { display: flex; align-items: center; gap: 15px; }
+        .logo-box img { height: 70px; }
+        .config-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 15px; background: #f1f3f5; padding: 20px; border-radius: 8px; align-items: end; }
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+        th { background: var(--dark); color: var(--primary); padding: 12px; text-align: left; text-transform: uppercase; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #EEE; }
+        input, select, textarea { padding: 10px; border: 1px solid #CED4DA; border-radius: 5px; width: 100%; box-sizing: border-box; }
+        .btn { padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-save { background: var(--dark); color: var(--primary); width: 100%; font-size: 1.2rem; margin-top: 25px; border: 2px solid var(--primary); }
+        .btn-save:hover { background: #333; }
+        .totals-panel { float: right; width: 350px; background: var(--dark); color: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        .history-section { margin-top: 60px; border-top: 2px solid #EEE; padding-top: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-ui">
+        <div class="logo-box">
+            <img src="NLOGO.png" alt="Logo" onerror="this.style.display='none'">
+            <h1 style="margin:0; letter-spacing: -1px;">AB TECHNOLOGY BY</h1>
+        </div>
+        <div style="text-align: right;">
+            <label style="font-size: 12px; font-weight: bold;">MONEDA BASE:</label>
+            <select id="moneda" onchange="recalcular()" style="width: 120px; font-weight: bold; border-color: var(--dark);">
+                <option value="$">$ USD (Dólares)</option>
+                <option value="€">€ EUR (Euros)</option>
+            </select>
+        </div>
+    </div>
+
+    <input type="hidden" id="editId">
+
+    <div class="config-grid">
+        <div>
+            <label>NOMBRE DEL CLIENTE:</label>
+            <input type="text" id="cliente" placeholder="Ej: Inversiones Globales C.A.">
+        </div>
+        <div style="text-align: center;">
+            <label>IVA 16%</label><br>
+            <input type="checkbox" id="checkIva" onchange="recalcular()" style="width: 22px; height: 22px; cursor:pointer;">
+        </div>
+        <div style="text-align: center;">
+            <label>NOTA BCV</label><br>
+            <input type="checkbox" id="checkNota" onchange="toggleBcvInfo()" style="width: 22px; height: 22px; cursor:pointer;">
+        </div>
+        <div style="text-align: center;">
+            <label>COMENTARIO</label><br>
+            <input type="checkbox" id="checkExtra" onchange="toggleExtra()" style="width: 22px; height: 22px; cursor:pointer;">
+        </div>
+    </div>
+
+    <div id="bcvInfo" style="display:none; background: #FFF3CD; padding: 10px; border-left: 5px solid #FFC107; margin-top: 15px; font-size: 13px;">
+        ⚠️ <b>Nota activa:</b> Se informará al cliente que el pago se rige por la tasa oficial del Banco Central de Venezuela.
+    </div>
+
+    <div id="extraArea" style="display:none; margin-top: 15px;">
+        <label>COMENTARIOS O CONDICIONES ADICIONALES:</label>
+        <textarea id="notaExtra" rows="2" placeholder="Ej: Garantía de 6 meses, entrega inmediata..."></textarea>
+    </div>
+
+    <table id="tablaItems">
+        <thead>
+            <tr>
+                <th>DESCRIPCIÓN DEL SERVICIO O PRODUCTO</th>
+                <th width="90">CANT.</th>
+                <th width="150">P. UNITARIO</th>
+                <th width="50"></th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <button class="btn" style="background: #28A745; color: white; margin-top: 15px;" onclick="agregarFila()">+ AGREGAR ITEM</button>
+
+    <div class="totals-panel">
+        <div style="display:flex; justify-content: space-between; margin-bottom: 8px;"><span>SUBTOTAL:</span> <span id="valSub">0.00</span></div>
+        <div id="rowIva" style="display:none; justify-content: space-between; margin-bottom: 8px;"><span>IVA (16%):</span> <span id="valIva">0.00</span></div>
+        <hr style="border: 0; border-top: 1px solid #444; margin: 10px 0;">
+        <div style="display:flex; justify-content: space-between; font-weight: bold; color: var(--primary); font-size: 1.4rem;">
+            <span>TOTAL:</span> <span id="valTotal">0.00</span>
+        </div>
+    </div>
+
+    <div style="clear: both;"></div>
+    <button class="btn btn-save" id="btnGuardar" onclick="guardar()">💾 PROCESAR Y GUARDAR COTIZACIÓN</button>
+    <button class="btn" id="btnCancel" style="display:none; width:100%; margin-top:10px; background:#6c757d; color:white;" onclick="location.reload()">CANCELAR EDICIÓN</button>
+
+    <div class="history-section">
+        <h3>📂 ARCHIVO DE PRESUPUESTOS</h3>
+        <table id="listaHistorial">
+            <thead>
+                <tr>
+                    <th>FOLIO</th>
+                    <th>CLIENTE</th>
+                    <th>MONTO</th>
+                    <th>ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    window.onload = () => { agregarFila(); cargarHistorial(); };
+
+    function toggleBcvInfo() { document.getElementById('bcvInfo').style.display = document.getElementById('checkNota').checked ? 'block' : 'none'; }
+    function toggleExtra() { document.getElementById('extraArea').style.display = document.getElementById('checkExtra').checked ? 'block' : 'none'; }
+
+    function agregarFila(p="", c=1, pr=0) {
+        const tbody = document.querySelector('#tablaItems tbody');
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td><input type="text" class="p-prod" value="${p}" placeholder="..."></td>
+            <td><input type="number" class="p-cant" value="${c}" oninput="recalcular()"></td>
+            <td><input type="number" class="p-prec" value="${pr}" oninput="recalcular()"></td>
+            <td><button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="this.parentElement.parentElement.remove(); recalcular()">×</button></td>
+        `;
+        recalcular();
+    }
+
+    function recalcular() {
+        const mon = document.getElementById('moneda').value.split(' ')[0];
+        let sub = 0;
+        document.querySelectorAll('#tablaItems tbody tr').forEach(row => {
+            const c = parseFloat(row.querySelector('.p-cant').value) || 0;
+            const p = parseFloat(row.querySelector('.p-prec').value) || 0;
+            sub += c * p;
+        });
+        const conIva = document.getElementById('checkIva').checked;
+        let iva = conIva ? sub * 0.16 : 0;
+        document.getElementById('rowIva').style.display = conIva ? 'flex' : 'none';
+        document.getElementById('valSub').innerText = `${mon} ${sub.toFixed(2)}`;
+        document.getElementById('valIva').innerText = `${mon} ${iva.toFixed(2)}`;
+        document.getElementById('valTotal').innerText = `${mon} ${(sub + iva).toFixed(2)}`;
+    }
+
+    async function guardar() {
+        const id = document.getElementById('editId').value;
+        const items = Array.from(document.querySelectorAll('#tablaItems tbody tr')).map(row => ({
+            producto: row.querySelector('.p-prod').value,
+            cantidad: row.querySelector('.p-cant').value,
+            precio: row.querySelector('.p-prec').value
+        }));
+
+        const data = {
+            cliente: document.getElementById('cliente').value,
+            subtotal: parseFloat(document.getElementById('valSub').innerText.split(' ')[1]),
+            iva: parseFloat(document.getElementById('valIva').innerText.split(' ')[1]),
+            total: parseFloat(document.getElementById('valTotal').innerText.split(' ')[1]),
+            con_iva: document.getElementById('checkIva').checked,
+            moneda: document.getElementById('moneda').value.split(' ')[0],
+            con_nota: document.getElementById('checkNota').checked,
+            nota_extra: document.getElementById('checkExtra').checked ? document.getElementById('notaExtra').value : "",
+            items
+        };
+
+        const config = {
+            method: id ? 'PUT' : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        };
+        
+        const url = id ? `http://localhost:3000/presupuesto/${id}` : 'http://localhost:3000/presupuesto';
+        const res = await fetch(url, config);
+        if(res.ok) location.reload();
+    }
+
+    async function cargarHistorial() {
+        const res = await fetch('http://localhost:3000/presupuestos');
+        const list = await res.json();
+        const tbody = document.querySelector('#listaHistorial tbody');
+        tbody.innerHTML = list.map(p => `
+            <tr>
+                <td><b>${p.numero}</b></td>
+                <td>${p.cliente}</td>
+                <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda} ${p.total.toFixed(2)}</span></td>
+                <td>
+                    <button class="btn" style="background:var(--primary); padding: 5px 12px;" onclick="window.open('http://localhost:3000/presupuesto/${p.id}/pdf')">PDF</button>
+                    <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar(${p.id})">EDITAR</button>
+                    <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar(${p.id})">BORRAR</button>
+                </td>
+            </tr>`).join('');
+    }
+
+    async function editar(id) {
+        const res = await fetch(`http://localhost:3000/presupuesto/${id}`);
+        const p = await res.json();
+        document.getElementById('editId').value = p.id;
+        document.getElementById('cliente').value = p.cliente;
+        document.getElementById('moneda').value = p.moneda.includes('$') ? '$ USD (Dólares)' : '€ EUR (Euros)';
+        document.getElementById('checkIva').checked = p.con_iva === 1;
+        document.getElementById('checkNota').checked = p.con_nota === 1;
+        document.getElementById('checkExtra').checked = p.nota_extra !== "";
+        document.getElementById('notaExtra').value = p.nota_extra || "";
+        
+        document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
+        document.getElementById('btnCancel').style.display = "block";
+        toggleBcvInfo(); toggleExtra();
+
+        const tbody = document.querySelector('#tablaItems tbody');
+        tbody.innerHTML = "";
+        p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
+        window.scrollTo(0,0);
+    }
+
+    async function eliminar(id) {
+        if(confirm("¿Estás seguro de eliminar este registro definitivamente?")) {
+            await fetch(`http://localhost:3000/presupuesto/${id}`, { method: 'DELETE' });
+            cargarHistorial();
+        }
+    }
+</script>
+</body>
+</html>
