@@ -25,6 +25,7 @@
   "build": {
     "appId": "com.abtechnology.presupuestos",
     "productName": "AB Technology Presupuestos",
+    "asar": false,
     "directories": {
       "output": "dist"
     },
@@ -43,11 +44,9 @@
     },
     "files": [
       "**/*",
-      "database.db",
       "NLOGO.png"
     ],
     "extraResources": [
-      "database.db",
       "NLOGO.png"
     ]
   }

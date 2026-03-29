@@ -12,7 +12,6 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 // CONFIGURACIÓN DE RUTA DE BASE DE DATOS PARA DISTRIBUCIÓN
-// Se crea en Documentos/AB-Technology para asegurar permisos de escritura
 const dataDir = path.join(os.homedir(), 'Documents', 'AB-Technology');
 if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
@@ -57,24 +56,14 @@ app.post('/presupuesto', (req, res) => {
     });
 });
 
-// ACTUALIZAR (CON CONVERSIÓN DE NÚMEROS)
+// ACTUALIZAR
 app.put('/presupuesto/:id', (req, res) => {
     const id = req.params.id;
     const { cliente, subtotal, iva, total, con_iva, moneda, con_nota, nota_extra, items } = req.body;
     
     db.serialize(() => {
         db.run(`UPDATE presupuestos SET cliente=?, subtotal=?, iva=?, total=?, con_iva=?, moneda=?, con_nota=?, nota_extra=? WHERE id=?`,
-            [
-                cliente, 
-                Number(subtotal) || 0, 
-                Number(iva) || 0, 
-                Number(total) || 0, 
-                con_iva ? 1 : 0, 
-                moneda, 
-                con_nota ? 1 : 0, 
-                nota_extra, 
-                id
-            ], (err) => {
+            [cliente, Number(subtotal) || 0, Number(iva) || 0, Number(total) || 0, con_iva ? 1 : 0, moneda, con_nota ? 1 : 0, nota_extra, id], (err) => {
                 if (err) return res.status(500).json({ error: err.message });
                 
                 db.run(`DELETE FROM items WHERE presupuesto_id = ?`, [id], () => {
@@ -111,15 +100,19 @@ app.delete('/presupuesto/:id', (req, res) => {
     });
 });
 
-// PDF CON DISEÑO ORIGINAL
+// PDF CON CORRECCIÓN DE RUTA DE IMAGEN PARA EXE
+// PDF CON CORRECCIÓN DE RUTA PARA PRODUCCIÓN (.EXE)
 app.get('/presupuesto/:id/pdf', (req, res) => {
     db.get("SELECT * FROM presupuestos WHERE id = ?", [req.params.id], (err, p) => {
-        if (err || !p) return res.status(404).send("Error: El presupuesto no existe en la base de datos.");
+        if (err || !p) return res.status(404).send("Error: El presupuesto no existe.");
 
         db.all("SELECT * FROM items WHERE presupuesto_id = ?", [req.params.id], (err, items) => {
             const doc = new PDFDocument({ margin: 40, size: 'LETTER' });
             res.setHeader('Content-Type', 'application/pdf');
             doc.pipe(res);
+
+            // DETECCIÓN DE RUTA DE LOGO (Funciona en VS Code y en el .EXE)
+            const logoPath = path.join(__dirname, 'NLOGO.png');
 
             // CABECERA
             doc.save();
@@ -129,20 +122,27 @@ app.get('/presupuesto/:id/pdf', (req, res) => {
             doc.restore();
 
             // MARCA DE AGUA
-            try {
-                doc.save().fillOpacity(0.2);
-                doc.image(path.join(__dirname, 'NLOGO.png'), 280, 450, { width: 340 });
-                doc.restore();
-            } catch (e) {}
+            if (fs.existsSync(logoPath)) {
+                try {
+                    doc.save().fillOpacity(0.2);
+                    doc.image(logoPath, 280, 450, { width: 340 });
+                    doc.restore();
+                } catch (e) {}
+            }
 
-            // LOGO Y DATOS EMPRESA
-            try { doc.image(path.join(__dirname, 'NLOGO.png'), 0, 0, { width: 160 }); } catch (e) {}
+            // LOGO SUPERIOR
+            if (fs.existsSync(logoPath)) {
+                try {
+                    doc.image(logoPath, 0, 0, { width: 160 });
+                } catch (e) {}
+            }
             
             doc.fillColor('white').fontSize(8).font('Helvetica-Bold')
                .text("AB TECHNOLOGY BY, C.A.", 170, 35)
                .text("RIF: J-506865270", 170, 47)
                .text("TELF: +58 4129669616", 170, 59);
 
+            // ... (Resto del código del PDF igual que antes)
             doc.fillColor('#1A1A1A').fontSize(14).font('Helvetica-Bold').text("COTIZACIÓN", 400, 35, { align: 'right' });
             doc.fontSize(10).text(p.numero || 'S/N', 400, 52, { align: 'right' });
             doc.fontSize(8).font('Helvetica').text(`Fecha: ${p.fecha || ''}`, 400, 65, { align: 'right' });
