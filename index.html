@@ -177,42 +177,88 @@
     }
 
     async function cargarHistorial() {
-        const res = await fetch('http://localhost:3000/presupuestos');
-        const list = await res.json();
-        const tbody = document.querySelector('#listaHistorial tbody');
-        tbody.innerHTML = list.map(p => `
-            <tr>
-                <td><b>${p.numero}</b></td>
-                <td>${p.cliente}</td>
-                <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda} ${p.total.toFixed(2)}</span></td>
-                <td>
-                    <button class="btn" style="background:var(--primary); padding: 5px 12px;" onclick="window.open('http://localhost:3000/presupuesto/${p.id}/pdf')">PDF</button>
-                    <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar(${p.id})">EDITAR</button>
-                    <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar(${p.id})">BORRAR</button>
-                </td>
-            </tr>`).join('');
+        try {
+            const res = await fetch('http://localhost:3000/presupuestos');
+            const list = await res.json();
+            const tbody = document.querySelector('#listaHistorial tbody');
+            
+            // Si no hay datos, limpiamos la tabla y salimos
+            if (!list || list.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No hay presupuestos guardados</td></tr>";
+                return;
+            }
+
+            tbody.innerHTML = list.map(p => {
+                // Validación de seguridad: si total es null o undefined, usa 0
+                const montoFormateado = (p.total || 0).toFixed(2);
+                
+                return `
+                <tr>
+                    <td><b>${p.numero || 'S/N'}</b></td>
+                    <td>${p.cliente || 'Sin Cliente'}</td>
+                    <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda || '$'} ${montoFormateado}</span></td>
+                    <td>
+                        <button class="btn" style="background:var(--primary); padding: 5px 12px; color:black;" onclick="window.open('http://localhost:3000/presupuesto/${p.id}/pdf')">PDF</button>
+                        <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar(${p.id})">EDITAR</button>
+                        <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar(${p.id})">BORRAR</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (error) {
+            console.error("Error cargando historial:", error);
+        }
     }
 
     async function editar(id) {
-        const res = await fetch(`http://localhost:3000/presupuesto/${id}`);
-        const p = await res.json();
-        document.getElementById('editId').value = p.id;
-        document.getElementById('cliente').value = p.cliente;
-        document.getElementById('moneda').value = p.moneda.includes('$') ? '$ USD (Dólares)' : '€ EUR (Euros)';
-        document.getElementById('checkIva').checked = p.con_iva === 1;
-        document.getElementById('checkNota').checked = p.con_nota === 1;
-        document.getElementById('checkExtra').checked = p.nota_extra !== "";
-        document.getElementById('notaExtra').value = p.nota_extra || "";
-        
-        document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
-        document.getElementById('btnCancel').style.display = "block";
-        toggleBcvInfo(); toggleExtra();
+    const res = await fetch(`http://localhost:3000/presupuesto/${id}`);
+    const p = await res.json();
+    
+    document.getElementById('editId').value = p.id;
+    document.getElementById('cliente').value = p.cliente;
 
-        const tbody = document.querySelector('#tablaItems tbody');
-        tbody.innerHTML = "";
-        p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
-        window.scrollTo(0,0);
+    // CORRECCIÓN PARA EL SELECTOR DE MONEDA:
+    // Si en tu HTML el valor de la opción es exactamente "$ USD (Dólares)", 
+    // debemos pasarle ese string completo.
+    const selectMoneda = document.getElementById('moneda');
+    
+    if (p.moneda && (p.moneda.includes('$') || p.moneda.includes('USD'))) {
+        selectMoneda.value = '$ USD (Dólares)';
+    } else if (p.moneda && (p.moneda.includes('€') || p.moneda.includes('EUR'))) {
+        selectMoneda.value = '€ EUR (Euros)';
+    } else {
+        selectMoneda.value = p.moneda; // Intento por defecto
     }
+
+    // Si después de lo anterior sigue vacío, forzamos por índice como último recurso
+    if (selectMoneda.value === "") {
+        selectMoneda.selectedIndex = (p.moneda === '$' || p.moneda === 'USD') ? 0 : 1;
+    }
+
+    document.getElementById('checkIva').checked = p.con_iva === 1;
+    document.getElementById('checkNota').checked = p.con_nota === 1;
+    document.getElementById('checkExtra').checked = (p.nota_extra && p.nota_extra !== "");
+    document.getElementById('notaExtra').value = p.nota_extra || "";
+    
+    document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
+    document.getElementById('btnCancel').style.display = "block";
+    
+    toggleBcvInfo(); 
+    toggleExtra();
+
+    const tbody = document.querySelector('#tablaItems tbody');
+    tbody.innerHTML = "";
+    
+    if (p.items && p.items.length > 0) {
+        p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
+    }
+    
+    // Forzamos el cálculo para que el Subtotal y Total se llenen en pantalla
+    if (typeof calcular === "function") {
+        calcular();
+    }
+
+    window.scrollTo(0,0);
+}
 
     async function eliminar(id) {
         if(confirm("¿Estás seguro de eliminar este registro definitivamente?")) {

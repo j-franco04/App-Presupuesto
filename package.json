@@ -1,13 +1,14 @@
 {
   "name": "presupuestos-app",
   "version": "1.0.0",
+  "description": "Sistema de Presupuestos AB TECHNOLOGY BY",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-packager . AB-Tech --platform=win32 --arch=x64 --icon=NLOGO.ico --overwrite"
+    "dist": "electron-builder"
   },
   "keywords": [],
-  "author": "",
+  "author": "Javier Franco",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -15,5 +16,39 @@
     "express": "^5.2.1",
     "pdfkit": "^0.18.0",
     "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "^26.8.1",
+    "electron-packager": "latest"
+  },
+  "build": {
+    "appId": "com.abtechnology.presupuestos",
+    "productName": "AB Technology Presupuestos",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "icono.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AB Technology"
+    },
+    "files": [
+      "**/*",
+      "database.db",
+      "NLOGO.png"
+    ],
+    "extraResources": [
+      "database.db",
+      "NLOGO.png"
+    ]
   }
 }

@@ -6,23 +6,28 @@ let mainWindow;
 let serverProcess;
 
 function createWindow() {
-    // 1. Iniciar el servidor de Node automáticamente (tu server.js)
+    // Iniciamos el proceso del servidor
     serverProcess = fork(path.join(__dirname, 'server.js'));
 
-    // 2. Crear la ventana del navegador
     mainWindow = new BrowserWindow({
         width: 1200,
-        height: 800,
-        icon: path.join(__dirname, 'NLOGO.png'), // Tu logo como icono
+        height: 850,
+        title: "AB TECHNOLOGY BY - Sistema de Presupuestos",
+        icon: path.join(__dirname, 'NLOGO.png'),
         webPreferences: {
-            nodeIntegration: false
+            nodeIntegration: false,
+            contextIsolation: true
         }
     });
 
-    // 3. Cargar la interfaz (esperamos un poco a que el server inicie)
-    setTimeout(() => {
-        mainWindow.loadURL('http://localhost:3000');
-    }, 1000);
+    // Intentar cargar hasta que el servidor responda
+    const loadApp = () => {
+        mainWindow.loadURL('http://localhost:3000').catch(() => {
+            setTimeout(loadApp, 500); 
+        });
+    };
+
+    loadApp();
 
     mainWindow.on('closed', () => {
         if (serverProcess) serverProcess.kill();
@@ -33,5 +38,8 @@ function createWindow() {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    if (process.platform !== 'darwin') {
+        if (serverProcess) serverProcess.kill();
+        app.quit();
+    }
 });
