@@ -1,14 +1,9 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const { fork } = require('child_process');
 
 let mainWindow;
-let serverProcess;
 
 function createWindow() {
-    // Iniciamos el proceso del servidor
-    serverProcess = fork(path.join(__dirname, 'server.js'));
-
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 850,
@@ -20,26 +15,21 @@ function createWindow() {
         }
     });
 
-    // Intentar cargar hasta que el servidor responda
-    const loadApp = () => {
-        mainWindow.loadURL('http://localhost:3000').catch(() => {
-            setTimeout(loadApp, 500); 
-        });
-    };
-
-    loadApp();
+    // En lugar de esperar a localhost, cargamos el archivo local directamente
+    mainWindow.loadFile('index.html');
 
     mainWindow.on('closed', () => {
-        if (serverProcess) serverProcess.kill();
         mainWindow = null;
     });
+
+    // Opcional: Quitar el menú superior para que parezca una app más limpia
+    // mainWindow.setMenu(null);
 }
 
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        if (serverProcess) serverProcess.kill();
         app.quit();
     }
 });
