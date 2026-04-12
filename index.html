@@ -112,6 +112,10 @@
 </div>
 
 <script>
+    // --- CONFIGURACIÓN ---
+    // Cuando subas a Render, cambia 'http://localhost:3000' por tu URL de Render
+    const API_URL = 'http://localhost:3000'; 
+
     window.onload = () => { agregarFila(); cargarHistorial(); };
 
     function toggleBcvInfo() { document.getElementById('bcvInfo').style.display = document.getElementById('checkNota').checked ? 'block' : 'none'; }
@@ -149,8 +153,8 @@
         const id = document.getElementById('editId').value;
         const items = Array.from(document.querySelectorAll('#tablaItems tbody tr')).map(row => ({
             producto: row.querySelector('.p-prod').value,
-            cantidad: row.querySelector('.p-cant').value,
-            precio: row.querySelector('.p-prec').value
+            cantidad: parseFloat(row.querySelector('.p-cant').value),
+            precio: parseFloat(row.querySelector('.p-prec').value)
         }));
 
         const data = {
@@ -162,7 +166,7 @@
             moneda: document.getElementById('moneda').value.split(' ')[0],
             con_nota: document.getElementById('checkNota').checked,
             nota_extra: document.getElementById('checkExtra').checked ? document.getElementById('notaExtra').value : "",
-            items
+            items: items
         };
 
         const config = {
@@ -171,36 +175,34 @@
             body: JSON.stringify(data)
         };
         
-        const url = id ? `http://localhost:3000/presupuesto/${id}` : 'http://localhost:3000/presupuesto';
+        const url = id ? `${API_URL}/presupuesto/${id}` : `${API_URL}/presupuesto`;
         const res = await fetch(url, config);
         if(res.ok) location.reload();
     }
 
     async function cargarHistorial() {
         try {
-            const res = await fetch('http://localhost:3000/presupuestos');
+            const res = await fetch(`${API_URL}/presupuestos`);
             const list = await res.json();
             const tbody = document.querySelector('#listaHistorial tbody');
             
-            // Si no hay datos, limpiamos la tabla y salimos
             if (!list || list.length === 0) {
                 tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No hay presupuestos guardados</td></tr>";
                 return;
             }
 
             tbody.innerHTML = list.map(p => {
-                // Validación de seguridad: si total es null o undefined, usa 0
                 const montoFormateado = (p.total || 0).toFixed(2);
-                
+                // IMPORTANTE: MongoDB usa ._id en lugar de .id
                 return `
                 <tr>
                     <td><b>${p.numero || 'S/N'}</b></td>
                     <td>${p.cliente || 'Sin Cliente'}</td>
                     <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda || '$'} ${montoFormateado}</span></td>
                     <td>
-                        <button class="btn" style="background:var(--primary); padding: 5px 12px; color:black;" onclick="window.open('http://localhost:3000/presupuesto/${p.id}/pdf')">PDF</button>
-                        <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar(${p.id})">EDITAR</button>
-                        <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar(${p.id})">BORRAR</button>
+                        <button class="btn" style="background:var(--primary); padding: 5px 12px; color:black;" onclick="window.open('${API_URL}/presupuesto/${p._id}/pdf')">PDF</button>
+                        <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar('${p._id}')">EDITAR</button>
+                        <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar('${p._id}')">BORRAR</button>
                     </td>
                 </tr>`;
             }).join('');
@@ -210,59 +212,40 @@
     }
 
     async function editar(id) {
-    const res = await fetch(`http://localhost:3000/presupuesto/${id}`);
-    const p = await res.json();
-    
-    document.getElementById('editId').value = p.id;
-    document.getElementById('cliente').value = p.cliente;
+        const res = await fetch(`${API_URL}/presupuesto/${id}`);
+        const p = await res.json();
+        
+        document.getElementById('editId').value = p._id; // Usamos _id de Mongo
+        document.getElementById('cliente').value = p.cliente;
 
-    // CORRECCIÓN PARA EL SELECTOR DE MONEDA:
-    // Si en tu HTML el valor de la opción es exactamente "$ USD (Dólares)", 
-    // debemos pasarle ese string completo.
-    const selectMoneda = document.getElementById('moneda');
-    
-    if (p.moneda && (p.moneda.includes('$') || p.moneda.includes('USD'))) {
-        selectMoneda.value = '$ USD (Dólares)';
-    } else if (p.moneda && (p.moneda.includes('€') || p.moneda.includes('EUR'))) {
-        selectMoneda.value = '€ EUR (Euros)';
-    } else {
-        selectMoneda.value = p.moneda; // Intento por defecto
+        const selectMoneda = document.getElementById('moneda');
+        selectMoneda.value = p.moneda === '$' ? '$ USD (Dólares)' : '€ EUR (Euros)';
+
+        document.getElementById('checkIva').checked = p.con_iva;
+        document.getElementById('checkNota').checked = p.con_nota;
+        document.getElementById('checkExtra').checked = (p.nota_extra && p.nota_extra !== "");
+        document.getElementById('notaExtra').value = p.nota_extra || "";
+        
+        document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
+        document.getElementById('btnCancel').style.display = "block";
+        
+        toggleBcvInfo(); 
+        toggleExtra();
+
+        const tbody = document.querySelector('#tablaItems tbody');
+        tbody.innerHTML = "";
+        
+        if (p.items && p.items.length > 0) {
+            p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
+        }
+        
+        recalcular();
+        window.scrollTo(0,0);
     }
-
-    // Si después de lo anterior sigue vacío, forzamos por índice como último recurso
-    if (selectMoneda.value === "") {
-        selectMoneda.selectedIndex = (p.moneda === '$' || p.moneda === 'USD') ? 0 : 1;
-    }
-
-    document.getElementById('checkIva').checked = p.con_iva === 1;
-    document.getElementById('checkNota').checked = p.con_nota === 1;
-    document.getElementById('checkExtra').checked = (p.nota_extra && p.nota_extra !== "");
-    document.getElementById('notaExtra').value = p.nota_extra || "";
-    
-    document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
-    document.getElementById('btnCancel').style.display = "block";
-    
-    toggleBcvInfo(); 
-    toggleExtra();
-
-    const tbody = document.querySelector('#tablaItems tbody');
-    tbody.innerHTML = "";
-    
-    if (p.items && p.items.length > 0) {
-        p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
-    }
-    
-    // Forzamos el cálculo para que el Subtotal y Total se llenen en pantalla
-    if (typeof calcular === "function") {
-        calcular();
-    }
-
-    window.scrollTo(0,0);
-}
 
     async function eliminar(id) {
         if(confirm("¿Estás seguro de eliminar este registro definitivamente?")) {
-            await fetch(`http://localhost:3000/presupuesto/${id}`, { method: 'DELETE' });
+            await fetch(`${API_URL}/presupuesto/${id}`, { method: 'DELETE' });
             cargarHistorial();
         }
     }
