@@ -1,5 +1,7 @@
 node_modules/
 dist/
 database.db
+main.js
+.env
 *.exe
 *.zip
