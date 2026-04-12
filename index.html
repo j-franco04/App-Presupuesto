@@ -113,13 +113,17 @@
 
 <script>
     // --- CONFIGURACIÓN ---
-    // Cuando subas a Render, cambia 'http://localhost:3000' por tu URL de Render
     const API_URL = 'https://app-presupuesto-a862.onrender.com'; 
 
-   window.onload = () => { agregarFila(); cargarHistorial(); };
+    window.onload = () => { agregarFila(); cargarHistorial(); };
 
-    function toggleBcvInfo() { document.getElementById('bcvInfo').style.display = document.getElementById('checkNota').checked ? 'block' : 'none'; }
-    function toggleExtra() { document.getElementById('extraArea').style.display = document.getElementById('checkExtra').checked ? 'block' : 'none'; }
+    function toggleBcvInfo() { 
+        document.getElementById('bcvInfo').style.display = document.getElementById('checkNota').checked ? 'block' : 'none'; 
+    }
+    
+    function toggleExtra() { 
+        document.getElementById('extraArea').style.display = document.getElementById('checkExtra').checked ? 'block' : 'none'; 
+    }
 
     function agregarFila(p="", c=1, pr=0) {
         const tbody = document.querySelector('#tablaItems tbody');
@@ -144,6 +148,7 @@
         const conIva = document.getElementById('checkIva').checked;
         let iva = conIva ? sub * 0.16 : 0;
         document.getElementById('rowIva').style.display = conIva ? 'flex' : 'none';
+        
         document.getElementById('valSub').innerText = `${mon} ${sub.toFixed(2)}`;
         document.getElementById('valIva').innerText = `${mon} ${iva.toFixed(2)}`;
         document.getElementById('valTotal').innerText = `${mon} ${(sub + iva).toFixed(2)}`;
@@ -157,8 +162,11 @@
             precio: parseFloat(row.querySelector('.p-prec').value) || 0
         }));
 
+        // Validar que haya al menos un item
+        if (items.length === 0) return alert("Agregue al menos un producto.");
+
         const data = {
-            cliente: document.getElementById('cliente').value,
+            cliente: document.getElementById('cliente').value || "CLIENTE GENERAL",
             subtotal: parseFloat(document.getElementById('valSub').innerText.split(' ')[1]),
             iva: parseFloat(document.getElementById('valIva').innerText.split(' ')[1]),
             total: parseFloat(document.getElementById('valTotal').innerText.split(' ')[1]),
@@ -169,15 +177,23 @@
             items
         };
 
-        const config = {
-            method: id ? 'PUT' : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        };
-        
-        const url = id ? `${API_URL}/presupuesto/${id}` : `${API_URL}/presupuesto`;
-        const res = await fetch(url, config);
-        if(res.ok) location.reload();
+        try {
+            const url = id ? `${API_URL}/presupuesto/${id}` : `${API_URL}/presupuesto`;
+            const res = await fetch(url, {
+                method: id ? 'PUT' : 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if(res.ok) {
+                alert(id ? "✅ Presupuesto actualizado" : "✅ Presupuesto guardado");
+                location.reload();
+            } else {
+                alert("❌ Error al guardar en el servidor");
+            }
+        } catch (err) {
+            alert("❌ No se pudo conectar con el servidor de Render");
+        }
     }
 
     async function cargarHistorial() {
@@ -204,6 +220,7 @@
                 </tr>`).join('');
         } catch (error) {
             console.error("Error cargando historial:", error);
+            document.querySelector('#listaHistorial tbody').innerHTML = "<tr><td colspan='4' style='text-align:center; color:red;'>Error al conectar con Render</td></tr>";
         }
     }
 
@@ -213,10 +230,12 @@
         
         document.getElementById('editId').value = p._id;
         document.getElementById('cliente').value = p.cliente;
-        document.getElementById('moneda').value = (p.moneda === '$' || p.moneda === 'USD') ? '$ USD (Dólares)' : '€ EUR (Euros)';
+        document.getElementById('moneda').value = p.moneda === '$' ? '$' : '€';
         document.getElementById('checkIva').checked = p.con_iva;
         document.getElementById('checkNota').checked = p.con_nota;
-        document.getElementById('checkExtra').checked = (p.nota_extra && p.nota_extra !== "");
+        
+        const tieneComentario = p.nota_extra && p.nota_extra.trim() !== "";
+        document.getElementById('checkExtra').checked = tieneComentario;
         document.getElementById('notaExtra').value = p.nota_extra || "";
         
         document.getElementById('btnGuardar').innerText = "✅ APLICAR CAMBIOS Y ACTUALIZAR";
