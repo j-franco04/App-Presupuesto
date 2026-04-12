@@ -146,9 +146,17 @@ app.get('/presupuesto/:id/pdf', async (req, res) => {
         // --- NUEVA SECCIÓN: NOTAS Y COMENTARIOS ---
         y += 40;
         if (p.con_nota) {
+            // Determinamos si es Dólares o Euros según el símbolo
             const nombreMoneda = p.moneda === '€' ? 'Euros' : 'Dólares';
+            
             doc.fillColor('#1A1A1A').font('Helvetica-Bold').fontSize(9).text("NOTA BCV:", 40, y);
-            doc.font('Helvetica').fontSize(8).text(`Los pagos en Bolívares se rigen por la tasa ${nombreMoneda} oficial del Banco Central de Venezuela vigente al momento del pago.`, 40, y + 12, { width: 500 });
+            
+            // Ajustamos el texto para que fluya mejor
+            doc.font('Helvetica').fontSize(8).text(
+                `Los pagos realizados en Bolívares se rigen por la tasa oficial del Banco Central de Venezuela (BCV) vigente al momento del pago, calculada sobre la base de ${nombreMoneda}.`, 
+                40, y + 12, { width: 500 }
+            );
+            
             y += 35;
         }
 
