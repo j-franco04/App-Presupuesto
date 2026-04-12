@@ -147,7 +147,7 @@ app.get('/presupuesto/:id/pdf', async (req, res) => {
         y += 40;
         if (p.con_nota) {
             doc.fillColor('#1A1A1A').font('Helvetica-Bold').fontSize(9).text("NOTA BCV:", 40, y);
-            doc.font('Helvetica').fontSize(8).text("Los pagos en Bolívares se rigen por la tasa oficial del Banco Central de Venezuela vigente al momento del pago.", 40, y + 12, { width: 500 });
+            doc.font('Helvetica').fontSize(8).text(`Los pagos en Bolívares se rigen por la tasa ${p.moneda} oficial del Banco Central de Venezuela vigente al momento del pago.`, 40, y + 12, { width: 500 });
             y += 35;
         }
 
