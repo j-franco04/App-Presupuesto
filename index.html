@@ -116,7 +116,7 @@
     // Cuando subas a Render, cambia 'http://localhost:3000' por tu URL de Render
     const API_URL = 'https://app-presupuesto-a862.onrender.com'; 
 
-    window.onload = () => { agregarFila(); cargarHistorial(); };
+   window.onload = () => { agregarFila(); cargarHistorial(); };
 
     function toggleBcvInfo() { document.getElementById('bcvInfo').style.display = document.getElementById('checkNota').checked ? 'block' : 'none'; }
     function toggleExtra() { document.getElementById('extraArea').style.display = document.getElementById('checkExtra').checked ? 'block' : 'none'; }
@@ -153,8 +153,8 @@
         const id = document.getElementById('editId').value;
         const items = Array.from(document.querySelectorAll('#tablaItems tbody tr')).map(row => ({
             producto: row.querySelector('.p-prod').value,
-            cantidad: parseFloat(row.querySelector('.p-cant').value),
-            precio: parseFloat(row.querySelector('.p-prec').value)
+            cantidad: parseFloat(row.querySelector('.p-cant').value) || 0,
+            precio: parseFloat(row.querySelector('.p-prec').value) || 0
         }));
 
         const data = {
@@ -166,7 +166,7 @@
             moneda: document.getElementById('moneda').value.split(' ')[0],
             con_nota: document.getElementById('checkNota').checked,
             nota_extra: document.getElementById('checkExtra').checked ? document.getElementById('notaExtra').value : "",
-            items: items
+            items
         };
 
         const config = {
@@ -191,21 +191,17 @@
                 return;
             }
 
-            tbody.innerHTML = list.map(p => {
-                const montoFormateado = (p.total || 0).toFixed(2);
-                // IMPORTANTE: MongoDB usa ._id en lugar de .id
-                return `
+            tbody.innerHTML = list.map(p => `
                 <tr>
                     <td><b>${p.numero || 'S/N'}</b></td>
                     <td>${p.cliente || 'Sin Cliente'}</td>
-                    <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda || '$'} ${montoFormateado}</span></td>
+                    <td><span style="background:#eee; padding: 2px 5px; border-radius:3px; font-weight:bold;">${p.moneda} ${(p.total || 0).toFixed(2)}</span></td>
                     <td>
                         <button class="btn" style="background:var(--primary); padding: 5px 12px; color:black;" onclick="window.open('${API_URL}/presupuesto/${p._id}/pdf')">PDF</button>
                         <button class="btn" style="background:#007bff; color:white; padding: 5px 12px;" onclick="editar('${p._id}')">EDITAR</button>
                         <button class="btn" style="background:#dc3545; color:white; padding: 5px 12px;" onclick="eliminar('${p._id}')">BORRAR</button>
                     </td>
-                </tr>`;
-            }).join('');
+                </tr>`).join('');
         } catch (error) {
             console.error("Error cargando historial:", error);
         }
@@ -215,12 +211,9 @@
         const res = await fetch(`${API_URL}/presupuesto/${id}`);
         const p = await res.json();
         
-        document.getElementById('editId').value = p._id; // Usamos _id de Mongo
+        document.getElementById('editId').value = p._id;
         document.getElementById('cliente').value = p.cliente;
-
-        const selectMoneda = document.getElementById('moneda');
-        selectMoneda.value = p.moneda === '$' ? '$ USD (Dólares)' : '€ EUR (Euros)';
-
+        document.getElementById('moneda').value = (p.moneda === '$' || p.moneda === 'USD') ? '$ USD (Dólares)' : '€ EUR (Euros)';
         document.getElementById('checkIva').checked = p.con_iva;
         document.getElementById('checkNota').checked = p.con_nota;
         document.getElementById('checkExtra').checked = (p.nota_extra && p.nota_extra !== "");
@@ -234,11 +227,7 @@
 
         const tbody = document.querySelector('#tablaItems tbody');
         tbody.innerHTML = "";
-        
-        if (p.items && p.items.length > 0) {
-            p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
-        }
-        
+        p.items.forEach(i => agregarFila(i.producto, i.cantidad, i.precio));
         recalcular();
         window.scrollTo(0,0);
     }

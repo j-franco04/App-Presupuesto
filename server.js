@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose'); // Reemplaza sqlite3
+const mongoose = require('mongoose');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
 const path = require('path');
@@ -15,7 +15,7 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ Conectado a MongoDB Atlas'))
     .catch(err => console.error('❌ Error de conexión:', err));
 
-// --- 2. MODELO DE DATOS (Esquema único) ---
+// --- 2. MODELO DE DATOS ---
 const PresupuestoSchema = new mongoose.Schema({
     numero: String,
     cliente: String,
@@ -38,12 +38,10 @@ const Presupuesto = mongoose.model('Presupuesto', PresupuestoSchema);
 
 // --- 3. RUTAS API ---
 
-// GUARDAR NUEVO
 app.post('/presupuesto', async (req, res) => {
     try {
         const count = await Presupuesto.countDocuments();
         const numero = "AB-" + String(count + 1).padStart(4, '0');
-        
         const nuevo = new Presupuesto({ ...req.body, numero });
         await nuevo.save();
         res.json({ id: nuevo._id });
@@ -52,7 +50,6 @@ app.post('/presupuesto', async (req, res) => {
     }
 });
 
-// ACTUALIZAR
 app.put('/presupuesto/:id', async (req, res) => {
     try {
         await Presupuesto.findByIdAndUpdate(req.params.id, req.body);
@@ -62,20 +59,17 @@ app.put('/presupuesto/:id', async (req, res) => {
     }
 });
 
-// LISTAR TODOS
 app.get('/presupuestos', async (req, res) => {
     const lista = await Presupuesto.find().sort({ fecha: -1 });
     res.json(lista);
 });
 
-// OBTENER UNO SOLO
 app.get('/presupuesto/:id', async (req, res) => {
     const p = await Presupuesto.findById(req.params.id);
     if (!p) return res.status(404).json({ error: "No encontrado" });
     res.json(p);
 });
 
-// ELIMINAR
 app.delete('/presupuesto/:id', async (req, res) => {
     await Presupuesto.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
@@ -91,17 +85,15 @@ app.get('/presupuesto/:id/pdf', async (req, res) => {
         res.setHeader('Content-Type', 'application/pdf');
         doc.pipe(res);
 
-        // Lógica de Logo (Mantenemos tu lógica de .EXE vs VS Code)
-        let logoPath = path.join(process.env.NODE_ENV === 'development' || !process.resourcesPath ? __dirname : process.resourcesPath, 'NLOGO.png');
+        let logoPath = path.join(__dirname, 'NLOGO.png');
 
-        // CABECERA (Diseño AB Technology)
+        // CABECERA
         doc.save();
         doc.fillOpacity(0.7);
         doc.moveTo(0, 0).lineTo(450, 0).lineTo(300, 110).lineTo(0, 110).fill('#1A1A1A');
         doc.moveTo(450, 0).lineTo(612, 0).lineTo(612, 110).lineTo(200, 110).fill('#ffbf00');
         doc.restore();
 
-        // LOGO
         if (fs.existsSync(logoPath)) {
             doc.image(logoPath, 0, 0, { width: 160 });
         }
@@ -113,7 +105,7 @@ app.get('/presupuesto/:id/pdf', async (req, res) => {
 
         doc.fillColor('#1A1A1A').fontSize(14).font('Helvetica-Bold').text("COTIZACIÓN", 400, 35, { align: 'right' });
         doc.fontSize(10).text(p.numero || 'S/N', 400, 52, { align: 'right' });
-        doc.fontSize(8).font('Helvetica').text(`Fecha: ${p.fecha.toLocaleDateString()}`, 400, 65, { align: 'right' });
+        doc.fontSize(8).font('Helvetica').text(`Fecha: ${new Date(p.fecha).toLocaleDateString()}`, 400, 65, { align: 'right' });
 
         doc.moveDown(8).fontSize(9).font('Helvetica-Bold').text("CLIENTE:");
         doc.fontSize(11).font('Helvetica').text((p.cliente || 'S/N').toUpperCase());
@@ -151,7 +143,20 @@ app.get('/presupuesto/:id/pdf', async (req, res) => {
         doc.fillColor('#FFC107').font('Helvetica-Bold').text("TOTAL A PAGAR:", 385, y + 2);
         doc.text(`${p.moneda} ${(p.total || 0).toFixed(2)}`, 500, y + 2);
 
-        // PIE DE PÁGINA (Tus datos bancarios)
+        // --- NUEVA SECCIÓN: NOTAS Y COMENTARIOS ---
+        y += 40;
+        if (p.con_nota) {
+            doc.fillColor('#1A1A1A').font('Helvetica-Bold').fontSize(9).text("NOTA BCV:", 40, y);
+            doc.font('Helvetica').fontSize(8).text("Los pagos en Bolívares se rigen por la tasa oficial del Banco Central de Venezuela vigente al momento del pago.", 40, y + 12, { width: 500 });
+            y += 35;
+        }
+
+        if (p.nota_extra) {
+            doc.fillColor('#1A1A1A').font('Helvetica-Bold').fontSize(9).text("COMENTARIOS:", 40, y);
+            doc.font('Helvetica').fontSize(8).text(p.nota_extra, 40, y + 12, { width: 500 });
+        }
+
+        // PIE DE PÁGINA
         const footerY = 700;
         doc.rect(40, footerY, 532, 1).fill('#DDD');
         doc.fillColor('#444').fontSize(7).font('Helvetica-Bold').text("BANESCO (CORRIENTE)", 40, footerY + 10);
