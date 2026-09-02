@@ -445,6 +445,7 @@ function urlPDF(id, descargar){
    2. ESTADO Y UTILIDADES
    ======================================================= */
 let CFG = null;
+let SIN_CARGAR = false;
 let PAGINA = 1, PAGINAS = 1;
 
 const $ = id => document.getElementById(id);
@@ -869,7 +870,12 @@ function filaMetodoCfg(m){
 function agregarMetodoCfg(){ $('listaMetodosCfg').appendChild(filaMetodoCfg({})); }
 
 function abrirConfig(pest){
-  if (!CFG) return aviso('Todavía no se cargó la configuración.', 'error');
+  // Si no hubo conexión igual se abre, para poder corregir la dirección o la clave.
+  if (!CFG) {
+    CFG = { empresa:{}, metodos_pago:[], prefijo:'AB', iva_porcentaje:16, validez_dias:15,
+            moneda_defecto:'$', condiciones_pago_defecto:'', tiempo_entrega_defecto:'', nota_bcv:'' };
+    SIN_CARGAR = true;
+  }
   $('e_nombre').value = CFG.empresa.nombre || ''; $('e_rif').value = CFG.empresa.rif || '';
   $('e_tel').value = CFG.empresa.telefono || ''; $('e_email').value = CFG.empresa.email || '';
   $('e_web').value = CFG.empresa.web || ''; $('e_dir').value = CFG.empresa.direccion || '';
@@ -878,6 +884,7 @@ function abrirConfig(pest){
   $('c_cond').value = CFG.condiciones_pago_defecto || ''; $('c_entrega').value = CFG.tiempo_entrega_defecto || '';
   $('c_nota').value = CFG.nota_bcv || '';
   $('con_url').value = Guardado.getItem('ab_api_url') || '';
+  $('con_url').placeholder = 'En uso ahora: ' + baseURL();
   $('con_key').value = Guardado.getItem('ab_api_key') || '';
 
   $('listaMetodosCfg').innerHTML = '';
@@ -897,6 +904,22 @@ async function guardarConfig(){
   url ? Guardado.setItem('ab_api_url', url) : Guardado.removeItem('ab_api_url');
   const k = $('con_key').value.trim();
   k ? Guardado.setItem('ab_api_key', k) : Guardado.removeItem('ab_api_key');
+
+  // Si nunca se pudo leer la configuración del servidor, este botón solo reconecta.
+  // Guardar aquí los campos vacíos borraría los datos buenos de la base de datos.
+  if (SIN_CARGAR) {
+    try {
+      CFG = await api('/config');
+      SIN_CARGAR = false;
+      aplicarDefectos(); pintarMetodosFormulario();
+      conexion(true, 'Conectado'); cargarHistorial();
+      aviso('Conexión establecida. Vuelve a abrir Configuración para editar tus datos.', 'ok');
+      cerrarConfig();
+    } catch (e) {
+      aviso('Sigue sin conectar: ' + e.message, 'error');
+    }
+    return;
+  }
 
   const metodos = Array.from($('listaMetodosCfg').children).map(d => ({
     _id: d.dataset.id || undefined,
