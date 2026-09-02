@@ -1,7 +1,6 @@
 node_modules/
 dist/
-database.db
-main.js
 .env
+database.db
 *.exe
 *.zip

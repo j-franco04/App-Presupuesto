@@ -1,16 +1,22 @@
 {
   "name": "presupuestos-app",
-  "version": "1.0.0",
-  "description": "Sistema de Presupuestos AB TECHNOLOGY BY",
+  "version": "2.0.0",
+  "description": "Sistema de Cotizaciones AB TECHNOLOGY BY",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "server": "node server.js",
+    "dev": "node --watch server.js",
+    "migrar": "node migrar.js",
     "build": "electron-builder"
   },
   "keywords": [],
   "author": "Javier Franco",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -19,18 +25,18 @@
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {
-    "electron": "latest",
+    "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.abtechnology.presupuestos",
-    "productName": "AB Technology Presupuestos",
+    "productName": "AB Technology Cotizaciones",
     "asar": true,
     "directories": {
       "output": "dist"
     },
     "win": {
-      "icon": "NLOGO.png",
+      "icon": "icono.ico",
       "target": [
         "nsis"
       ]
@@ -43,13 +49,10 @@
       "shortcutName": "AB Technology"
     },
     "files": [
-      "index.html",
       "main.js",
-      "NLOGO.png",
-      "package.json"
-    ],
-    "extraResources": [
-      "NLOGO.png"
+      "package.json",
+      "public/**/*",
+      "icono.ico"
     ]
   }
 }
