@@ -248,39 +248,50 @@ function bloqueTexto(doc, y, titulo, texto) {
     return y + 12 + h + 12;
 }
 
-function metodosPago(doc, p, y) {
-    const lista = (p.metodos_pago || []).filter(Boolean);
-    if (!lista.length) return y;
+/**
+ * Banda compacta de formas de pago.
+ * Se ancla SIEMPRE al pie de la página, justo encima de la línea del footer,
+ * para que no quede flotando en medio de la hoja ni empuje contenido.
+ * Solo salta de página si de verdad no queda espacio libre.
+ */
+function altoMetodos(lista) {
+    if (!lista.length) return 0;
+    return 19 + Math.ceil(lista.length / 3) * 31;
+}
 
-    const filas = Math.ceil(lista.length / 2);
-    const alto = 22 + filas * 52;
-    if (y + alto > LIMITE) { doc.addPage(); y = TOPE; }
+function dibujarMetodos(doc, y, lista) {
+    doc.rect(M, y, CW, 14).fill(NEGRO);
+    doc.fillColor(AMARILLO).font('Helvetica-Bold').fontSize(6.8)
+        .text('DATOS PARA EL PAGO', M + 8, y + 4, { width: 200, lineBreak: false });
 
-    y = tituloBloque(doc, M, y, CW, 'DATOS PARA EL PAGO') + 8;
+    const ancho = (CW - 12) / 3;
 
     lista.forEach((m, i) => {
-        const col = i % 2;
-        const x = M + col * 270;
-        const yy = y + Math.floor(i / 2) * 52;
-        const w = 254;
+        const x = M + (i % 3) * (ancho + 6);
+        const yy = y + 19 + Math.floor(i / 3) * 31;
 
-        doc.lineWidth(0.7).strokeColor(LINEA).rect(x, yy, w, 46).stroke();
-        doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(8.5)
-            .text(m.nombre || m.banco || 'Pago', x + 8, yy + 6, { width: w - 16, lineBreak: false });
-        doc.fillColor(GRIS).font('Helvetica').fontSize(7)
-            .text((m.tipo || '').toUpperCase(), x + 8, yy + 6, { width: w - 16, align: 'right', lineBreak: false });
+        doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(7.2)
+            .text(m.nombre || m.banco || m.tipo || 'Pago', x, yy, { width: ancho, height: 9, ellipsis: true });
 
-        const detalle = [
-            m.numero ? m.numero : '',
-            m.titular ? `${m.titular}${m.documento ? ' · ' + m.documento : ''}` : '',
-            m.detalle || ''
-        ].filter(Boolean).join('\n');
+        doc.fillColor('#333333').font('Helvetica').fontSize(7.2)
+            .text(m.numero || m.detalle || '', x, yy + 8.5, { width: ancho, height: 9, ellipsis: true });
 
-        doc.fillColor('#333333').font('Helvetica').fontSize(7.8)
-            .text(detalle, x + 8, yy + 19, { width: w - 16, height: 24, ellipsis: true });
+        const pie = [m.titular, m.documento].filter(Boolean).join(' · ') || (m.tipo || '');
+        doc.fillColor(GRIS).font('Helvetica').fontSize(6.4)
+            .text(pie, x, yy + 17, { width: ancho, height: 8, ellipsis: true });
     });
+}
 
-    return y + filas * 52 + 6;
+function metodosPago(doc, p, y) {
+    const lista = (p.metodos_pago || []).filter(Boolean).slice(0, 9);
+    if (!lista.length) return y;
+
+    const alto = altoMetodos(lista);
+    const tope = 734 - alto;              // 10 pt por encima de la línea del pie
+
+    if (y > tope) doc.addPage();          // no cabe: se va al pie de la hoja siguiente
+    dibujarMetodos(doc, tope, lista);
+    return tope + alto;
 }
 
 function pies(doc, cfg) {

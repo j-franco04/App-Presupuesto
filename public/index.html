@@ -445,7 +445,6 @@ function urlPDF(id, descargar){
    2. ESTADO Y UTILIDADES
    ======================================================= */
 let CFG = null;
-let SIN_CARGAR = false;
 let PAGINA = 1, PAGINAS = 1;
 
 const $ = id => document.getElementById(id);
@@ -663,8 +662,12 @@ async function editar(id){
     $('areaExtra').style.display = tieneExtra ? 'block' : 'none';
     $('d_nota_extra').value = p.nota_extra || '';
 
+    // Las cotizaciones creadas con la versión 1 no tienen formas de pago guardadas:
+    // en ese caso se marcan todas las activas, como en una cotización nueva.
     const ids = (p.metodos_pago || []).map(m => String(m.origen_id));
-    document.querySelectorAll('.mp-check').forEach(ch => ch.checked = ids.includes(ch.value));
+    document.querySelectorAll('.mp-check').forEach(ch => {
+      ch.checked = ids.length ? ids.includes(ch.value) : true;
+    });
 
     $('items').innerHTML = '';
     (p.items || []).forEach(nuevaFila);
@@ -866,11 +869,7 @@ function filaMetodoCfg(m){
 function agregarMetodoCfg(){ $('listaMetodosCfg').appendChild(filaMetodoCfg({})); }
 
 function abrirConfig(pest){
-    if (!CFG) {
-    CFG = { empresa:{}, metodos_pago:[], prefijo:'AB', iva_porcentaje:16, validez_dias:15,
-            moneda_defecto:'$', condiciones_pago_defecto:'', tiempo_entrega_defecto:'', nota_bcv:'' };
-    SIN_CARGAR = true;
-  }
+  if (!CFG) return aviso('Todavía no se cargó la configuración.', 'error');
   $('e_nombre').value = CFG.empresa.nombre || ''; $('e_rif').value = CFG.empresa.rif || '';
   $('e_tel').value = CFG.empresa.telefono || ''; $('e_email').value = CFG.empresa.email || '';
   $('e_web').value = CFG.empresa.web || ''; $('e_dir').value = CFG.empresa.direccion || '';
@@ -898,16 +897,6 @@ async function guardarConfig(){
   url ? Guardado.setItem('ab_api_url', url) : Guardado.removeItem('ab_api_url');
   const k = $('con_key').value.trim();
   k ? Guardado.setItem('ab_api_key', k) : Guardado.removeItem('ab_api_key');
-    if (SIN_CARGAR) {
-    try {
-      CFG = await api('/config');
-      SIN_CARGAR = false;
-      aplicarDefectos(); pintarMetodosFormulario(); conexion(true, 'Conectado'); cargarHistorial();
-      aviso('Conexión establecida. Abre Configuración de nuevo para editar tus datos.', 'ok');
-      cerrarConfig();
-    } catch (e) { aviso('No se pudo conectar: ' + e.message, 'error'); }
-    return;
-  }
 
   const metodos = Array.from($('listaMetodosCfg').children).map(d => ({
     _id: d.dataset.id || undefined,
