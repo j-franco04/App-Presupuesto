@@ -46,13 +46,19 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "AB Technology"
+      "shortcutName": "AB Technology Cotizaciones",
+      "perMachine": false,
+      "artifactName": "AB-Technology-Cotizaciones-Instalador-${version}.${ext}"
     },
     "files": [
       "main.js",
+      "preload.js",
+      "conexion.html",
       "package.json",
-      "public/**/*",
       "icono.ico"
-    ]
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    }
   }
 }
