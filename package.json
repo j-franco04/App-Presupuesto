@@ -9,7 +9,8 @@
     "dev": "node --watch server.js",
     "migrar": "node migrar.js",
     "build": "electron-builder",
-    "catalogo": "node catalogo-a2.js"
+    "catalogo": "node catalogo-a2.js",
+    "respaldo": "node respaldo.js"
   },
   "keywords": [],
   "author": "Javier Franco",

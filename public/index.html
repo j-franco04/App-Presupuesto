@@ -188,7 +188,8 @@ table{width:100%; border-collapse:collapse}
       <div class="rejilla c2">
         <div>
           <label class="campo" for="cl_nombre">Nombre o razón social</label>
-          <input id="cl_nombre" placeholder="Inversiones Globales, C.A.">
+          <input id="cl_nombre" placeholder="Inversiones Globales, C.A." list="listaClientes" autocomplete="off">
+          <datalist id="listaClientes"></datalist>
         </div>
         <div>
           <label class="campo" for="cl_rif">RIF / C.I.</label>
@@ -549,6 +550,7 @@ let CFG = null;
 let SIN_CARGAR = false;
 let TIPO = 'cotizacion';
 let CATALOGO = [];
+let CLIENTES = [];
 
 const ESTADOS = {
   cotizacion:   [['borrador','Borrador'],['enviado','Enviada al cliente'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']],
@@ -735,6 +737,7 @@ async function guardar(){
     aviso(id ? nombreDoc + ' actualizada.' : nombreDoc + ' ' + res.numero + ' guardada.', 'ok');
     nuevoPresupuesto();
     cargarHistorial();
+    cargarClientes();
   } catch (e) {
     aviso('No se pudo guardar: ' + e.message, 'error');
   } finally {
@@ -744,6 +747,7 @@ async function guardar(){
 }
 
 function nuevoPresupuesto(){
+  ULTIMO_AUTO = null;
   $('editId').value = '';
   ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo','origenNumero']
     .forEach(i => $(i).value = '');
@@ -778,6 +782,7 @@ function aplicarDefectos(){
 async function editar(id){
   try {
     const p = await api('/presupuestos/' + id);
+    ULTIMO_AUTO = null;
     $('editId').value = p._id;
     TIPO = p.tipo === 'nota_entrega' ? 'nota_entrega' : 'cotizacion';
     $('d_trabajo').value = p.trabajo_realizado || '';
@@ -1138,6 +1143,55 @@ async function importarLista(){
 }
 
 /* =======================================================
+   5c. CLIENTES FRECUENTES
+   ======================================================= */
+async function cargarClientes(){
+  try { CLIENTES = await api('/clientes'); } catch(e){ CLIENTES = []; }
+  const dl = $('listaClientes');
+  dl.innerHTML = '';
+  CLIENTES.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.nombre;
+    if (c.rif) o.label = c.rif;
+    dl.appendChild(o);
+  });
+}
+
+const CAMPOS_CLIENTE = [['cl_rif','rif'],['cl_direccion','direccion'],['cl_telefono','telefono'],
+                        ['cl_email','email'],['cl_contacto','contacto']];
+let ULTIMO_AUTO = null;   // último cliente cargado automáticamente
+
+/**
+ * Al escribir o elegir un cliente ya usado, se rellenan sus datos.
+ * Si después se escribe otro nombre, se limpian los datos que había puesto
+ * el autocompletado, para no enviar una cotización con el RIF equivocado.
+ */
+function autocompletarCliente(){
+  const escrito = $('cl_nombre').value.trim().toLowerCase();
+  const c = escrito
+    ? CLIENTES.find(x => (x.nombre || '').trim().toLowerCase() === escrito)
+    : null;
+
+  if (!c){
+    if (ULTIMO_AUTO){
+      // Solo se borra lo que sigue siendo idéntico a lo que cargó la app
+      CAMPOS_CLIENTE.forEach(([id, clave]) => {
+        if (ULTIMO_AUTO[clave] && $(id).value.trim() === String(ULTIMO_AUTO[clave]).trim()) $(id).value = '';
+      });
+      ULTIMO_AUTO = null;
+    }
+    return;
+  }
+
+  let cambiados = 0;
+  CAMPOS_CLIENTE.forEach(([id, clave]) => {
+    if (c[clave] && $(id).value.trim() !== c[clave]){ $(id).value = c[clave]; cambiados++; }
+  });
+  ULTIMO_AUTO = c;
+  if (cambiados) aviso('Datos de ' + c.nombre + ' cargados (' + c.cantidad + ' documentos previos).', 'ok');
+}
+
+/* =======================================================
    6. CONFIGURACIÓN
    ======================================================= */
 function pintarMetodosFormulario(){
@@ -1327,6 +1381,8 @@ async function iniciar(){
   $('h_estado').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('h_tipo').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
+  $('cl_nombre').addEventListener('change', autocompletarCliente);
+  $('cl_nombre').addEventListener('input', autocompletarCliente);
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's'){ e.preventDefault(); guardar(); }
     if (e.key === 'Escape'){ cerrarConfig(); cerrarCatalogo(); }
@@ -1339,6 +1395,7 @@ async function iniciar(){
     aplicarDefectos();
     pintarMetodosFormulario();
     await cargarCatalogo();
+    await cargarClientes();
     conexion(true, 'Conectado');
   } catch(e){
     conexion(false, 'Sin conexión');

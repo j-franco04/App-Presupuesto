@@ -450,6 +450,25 @@ api.get('/presupuestos/:id/pdf', async (req, res, next) => {
     }
 });
 
+/* --- Clientes ya usados, para autocompletar --- */
+api.get('/clientes', async (req, res, next) => {
+    try {
+        const lista = await Presupuesto.aggregate([
+            { $match: { 'cliente.nombre': { $nin: ['', null, 'CLIENTE GENERAL'] } } },
+            { $sort: { fecha: -1 } },
+            { $group: {
+                _id: { $toLower: '$cliente.nombre' },
+                cliente: { $first: '$cliente' },
+                ultima: { $first: '$fecha' },
+                cantidad: { $sum: 1 }
+            } },
+            { $sort: { ultima: -1 } },
+            { $limit: 400 }
+        ]);
+        res.json(lista.map(x => Object.assign({}, x.cliente, { cantidad: x.cantidad })));
+    } catch (e) { next(e); }
+});
+
 /* --- Resumen para el panel --- */
 api.get('/resumen', async (req, res, next) => {
     try {
