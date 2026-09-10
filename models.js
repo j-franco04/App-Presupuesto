@@ -138,7 +138,9 @@ const ConfigSchema = new mongoose.Schema({
         default: 'Los pagos realizados en Bolívares se rigen por la tasa oficial del Banco Central de Venezuela (BCV) vigente al momento del pago, calculada sobre la base de {moneda}.'
     },
     metodos_pago: [MetodoPagoSchema]
-}, { minimize: false });
+// Colección propia: en la base 'test' puede existir otra colección 'configs'
+// de un proyecto distinto, con índices que no son de este sistema.
+}, { minimize: false, collection: 'ab_config' });
 
 /* ---------------------------------------------------------------
    5. CATÁLOGO DE PRODUCTOS (lista de precios a2 y lo que agregues)
@@ -162,7 +164,7 @@ const ProductoSchema = new mongoose.Schema({
 const ContadorSchema = new mongoose.Schema({
     _id: String,
     seq: { type: Number, default: 0 }
-});
+}, { collection: 'ab_contadores' });
 
 const Presupuesto = mongoose.model('Presupuesto', PresupuestoSchema);
 const Producto    = mongoose.model('Producto', ProductoSchema);

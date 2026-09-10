@@ -486,6 +486,11 @@ conectar(process.env.MONGO_URI)
         });
     })
     .catch(err => {
-        console.error('❌ No se pudo conectar a MongoDB:', err.message);
+        if (err.code === 11000) {
+            console.error('❌ Choque de colecciones en la base de datos:', err.message);
+            console.error('   Revisa que models.js tenga las opciones collection: ab_config y ab_contadores.');
+        } else {
+            console.error('❌ No se pudo iniciar el servidor:', err.message);
+        }
         process.exit(1);
     });
