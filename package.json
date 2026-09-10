@@ -8,7 +8,8 @@
     "server": "node server.js",
     "dev": "node --watch server.js",
     "migrar": "node migrar.js",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "catalogo": "node catalogo-a2.js"
   },
   "keywords": [],
   "author": "Javier Franco",

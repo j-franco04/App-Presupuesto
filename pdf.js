@@ -132,10 +132,15 @@ function bloqueDatos(doc, p, cfg, y) {
     yi += 4;
 
     // ----- Documento -----
-    let yd = tituloBloque(doc, derX, y, derW, 'COTIZACIÓN') + 6;
+    const esNota = p.tipo === 'nota_entrega';
+    let yd = tituloBloque(doc, derX, y, derW, esNota ? 'NOTA DE ENTREGA' : 'COTIZACIÓN') + 6;
     yd += filaDato(doc, derX, yd, derW, 'N° FOLIO', p.numero || 'S/N');
     yd += filaDato(doc, derX, yd, derW, 'FECHA', fecha(p.fecha));
-    yd += filaDato(doc, derX, yd, derW, 'VÁLIDA HASTA', fecha(sumarDias(p.fecha, p.validez_dias)));
+    if (esNota) {
+        if (p.origen && p.origen.numero) yd += filaDato(doc, derX, yd, derW, 'COTIZACIÓN', p.origen.numero);
+    } else {
+        yd += filaDato(doc, derX, yd, derW, 'VÁLIDA HASTA', fecha(sumarDias(p.fecha, p.validez_dias)));
+    }
     yd += filaDato(doc, derX, yd, derW, 'MONEDA', `${p.moneda} (${nombreMoneda(p.moneda)})`);
     if (p.tasa_bcv > 0) yd += filaDato(doc, derX, yd, derW, 'TASA BCV', nf(p.tasa_bcv));
     yd += 4;
@@ -244,8 +249,8 @@ function bloqueTexto(doc, y, titulo, texto) {
     const h = doc.heightOfString(texto, { width: CW - 16 });
     if (y + h + 30 > LIMITE) { doc.addPage(); y = TOPE; }
     doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(8).text(titulo, M, y);
-    doc.fillColor('#333333').font('Helvetica').fontSize(8.5).text(texto, M, y + 12, { width: CW - 16 });
-    return y + 12 + h + 12;
+    doc.fillColor('#333333').font('Helvetica').fontSize(8.5).text(texto, M, y + 11, { width: CW - 16 });
+    return y + 11 + h + 10;
 }
 
 /**
@@ -282,16 +287,44 @@ function dibujarMetodos(doc, y, lista) {
     });
 }
 
-function metodosPago(doc, p, y) {
+/**
+ * Pie del documento: firmas (solo en notas de entrega) y formas de pago.
+ * Los dos bloques viajan juntos y se anclan al final de la hoja, así nunca
+ * quedan flotando en el medio ni se separan uno del otro.
+ */
+function pieDocumento(doc, p, y) {
     const lista = (p.metodos_pago || []).filter(Boolean).slice(0, 9);
-    if (!lista.length) return y;
+    const altoPagos = altoMetodos(lista);
+    const conFirmas = p.tipo === 'nota_entrega';
+    const altoFirmas = conFirmas ? ALTO_FIRMAS : 0;
+    const separacion = (altoFirmas && altoPagos) ? 8 : 0;
+    const total = altoFirmas + separacion + altoPagos;
+    if (!total) return y;
 
-    const alto = altoMetodos(lista);
-    const tope = 734 - alto;              // 10 pt por encima de la línea del pie
+    // Si cabe en la hoja actual se ancla abajo; si hay que pasar de página,
+    // se coloca arriba para no dejar una hoja casi en blanco.
+    const tope = 734 - total;             // 10 pt por encima de la línea del pie
+    let yy = tope;
+    if (y > tope) { doc.addPage(); yy = TOPE; }
+    if (altoFirmas) { dibujarFirmas(doc, yy); yy += altoFirmas + separacion; }
+    if (altoPagos) dibujarMetodos(doc, yy, lista);
+    return yy + altoPagos;
+}
 
-    if (y > tope) doc.addPage();          // no cabe: se va al pie de la hoja siguiente
-    dibujarMetodos(doc, tope, lista);
-    return tope + alto;
+const ALTO_FIRMAS = 54;
+
+function dibujarFirmas(doc, y) {
+    const ancho = 240;
+
+    [['ENTREGADO POR', 'AB TECHNOLOGY BY, C.A.'], ['RECIBIDO CONFORME', 'Nombre, C.I. y fecha']]
+        .forEach((par, i) => {
+            const x = M + i * 292;
+            doc.moveTo(x, y + 32).lineTo(x + ancho, y + 32).lineWidth(0.7).strokeColor('#9A9A94').stroke();
+            doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(7.5)
+                .text(par[0], x, y + 37, { width: ancho, align: 'center' });
+            doc.fillColor(GRIS).font('Helvetica').fontSize(6.8)
+                .text(par[1], x, y + 47, { width: ancho, align: 'center' });
+        });
 }
 
 function pies(doc, cfg) {
@@ -316,9 +349,9 @@ function generarPDF(p, cfg, stream) {
         margin: M,
         bufferPages: true,
         info: {
-            Title: `Cotización ${p.numero || ''}`,
+            Title: `${p.tipo === 'nota_entrega' ? 'Nota de entrega' : 'Cotización'} ${p.numero || ''}`,
             Author: (cfg.empresa && cfg.empresa.nombre) || 'AB TECHNOLOGY BY',
-            Subject: `Cotización para ${(p.cliente && p.cliente.nombre) || ''}`
+            Subject: `Documento para ${(p.cliente && p.cliente.nombre) || ''}`
         }
     });
     doc.pipe(stream);
@@ -328,13 +361,21 @@ function generarPDF(p, cfg, stream) {
     y = tablaItems(doc, p, y);
     y = totales(doc, p, y);
 
+    const esNota = p.tipo === 'nota_entrega';
+
+    if (esNota && p.trabajo_realizado) {
+        y = bloqueTexto(doc, y, 'DETALLE DEL TRABAJO REALIZADO', p.trabajo_realizado);
+    }
+
     const condiciones = [
         p.condiciones_pago ? `Condiciones de pago: ${p.condiciones_pago}` : '',
-        p.tiempo_entrega ? `Tiempo de entrega: ${p.tiempo_entrega}` : '',
-        `Validez de la oferta: ${p.validez_dias || 0} días (hasta el ${fecha(sumarDias(p.fecha, p.validez_dias))}).`
+        (!esNota && p.tiempo_entrega) ? `Tiempo de entrega: ${p.tiempo_entrega}` : '',
+        esNota
+            ? ''
+            : `Validez de la oferta: ${p.validez_dias || 0} días (hasta el ${fecha(sumarDias(p.fecha, p.validez_dias))}).`
     ].filter(Boolean).join('\n');
 
-    y = bloqueTexto(doc, y, 'CONDICIONES COMERCIALES', condiciones);
+    y = bloqueTexto(doc, y, esNota ? 'CONDICIONES DE PAGO' : 'CONDICIONES COMERCIALES', condiciones);
 
     if (p.con_nota) {
         const plantilla = cfg.nota_bcv || '';
@@ -342,7 +383,7 @@ function generarPDF(p, cfg, stream) {
     }
     if (p.nota_extra) y = bloqueTexto(doc, y, 'COMENTARIOS ADICIONALES', p.nota_extra);
 
-    y = metodosPago(doc, p, y);
+    y = pieDocumento(doc, p, y);
 
     pies(doc, cfg);
     doc.end();

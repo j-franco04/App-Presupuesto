@@ -8,7 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const {
-    Presupuesto, Config, conectar, obtenerConfig, siguienteNumero
+    Presupuesto, Config, Producto, conectar, obtenerConfig, siguienteNumero
 } = require('./models');
 const { generarPDF } = require('./pdf');
 
@@ -95,9 +95,14 @@ function normalizar(body, cfg) {
         }));
 
     const moneda = ['$', '€'].includes(body.moneda) ? body.moneda : '$';
-    const estados = ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'];
+    const tipo = body.tipo === 'nota_entrega' ? 'nota_entrega' : 'cotizacion';
+    const estados = tipo === 'nota_entrega'
+        ? ['borrador', 'entregada', 'pagada', 'anulado']
+        : ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'];
 
     return {
+        tipo,
+        trabajo_realizado: tipo === 'nota_entrega' ? txt(body.trabajo_realizado, 5000) : '',
         estado: estados.includes(body.estado) ? body.estado : 'borrador',
         cliente: {
             nombre: txt(body.cliente && body.cliente.nombre, 200) || 'CLIENTE GENERAL',
@@ -147,6 +152,7 @@ api.put('/config', async (req, res, next) => {
             cfg.empresa.web = txt(b.empresa.web, 120);
         }
         if (b.prefijo !== undefined) cfg.prefijo = txt(b.prefijo, 8).toUpperCase() || 'AB';
+        if (b.prefijo_nota !== undefined) cfg.prefijo_nota = txt(b.prefijo_nota, 8).toUpperCase() || 'NE';
         if (b.iva_porcentaje !== undefined) cfg.iva_porcentaje = Math.max(0, Math.min(100, num(b.iva_porcentaje)));
         if (b.validez_dias !== undefined) cfg.validez_dias = Math.max(0, Math.min(365, parseInt(b.validez_dias, 10) || 15));
         if (b.moneda_defecto !== undefined) cfg.moneda_defecto = ['$', '€'].includes(b.moneda_defecto) ? b.moneda_defecto : '$';
@@ -174,6 +180,119 @@ api.put('/config', async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
+/* =========================================================
+   CATÁLOGO DE PRODUCTOS
+   ========================================================= */
+
+/**
+ * Interpreta un precio escrito de cualquier forma:
+ * "€152,31"  "1.311,52"  "1,311.52"  "83.87"  ->  número
+ */
+function precioDeTexto(txtPrecio) {
+    let t = String(txtPrecio).replace(/[^\d.,]/g, '').trim();
+    if (!t) return 0;
+    const tieneComa = t.includes(','), tienePunto = t.includes('.');
+
+    if (tieneComa && tienePunto) {
+        // El separador decimal es el último que aparece
+        t = t.lastIndexOf(',') > t.lastIndexOf('.')
+            ? t.replace(/\./g, '').replace(',', '.')
+            : t.replace(/,/g, '');
+    } else if (tieneComa) {
+        // Una sola coma con 1 o 2 decimales = decimal; si no, son miles
+        t = /,\d{1,2}$/.test(t) ? t.replace(',', '.') : t.replace(/,/g, '');
+    } else if (tienePunto && !/\.\d{1,2}$/.test(t)) {
+        t = t.replace(/\./g, '');   // 1.311 = mil trescientos once
+    }
+    const n = parseFloat(t);
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+/** Convierte el texto pegado de la lista de precios en productos. */
+function interpretarLista(texto, monedaDefecto, incluyeIva) {
+    const filas = [];
+    let categoria = 'General';
+
+    String(texto || '').split(/\r?\n/).forEach(linea => {
+        const l = linea.replace(/\|/g, '\t').trim();
+        if (!l || /^[-\s\t]+$/.test(l)) return;
+
+        // Última cifra de la línea = precio
+        const m = l.match(/([€$]?\s*[\d][\d.,]*)\s*$/);
+        const nombre = (m ? l.slice(0, m.index) : l).replace(/\t+/g, ' ').replace(/\*+/g, '').trim();
+        if (!nombre) return;
+
+        if (!m) {                       // línea sin precio = título de categoría
+            const primera = l.split('\t')[0].replace(/\*+/g, '').trim();
+            if (primera && primera.length <= 60) categoria = primera;
+            return;
+        }
+
+        const precio = precioDeTexto(m[1]);
+        if (!precio) return;
+        const moneda = m[1].includes('$') ? '$' : (m[1].includes('€') ? '€' : monedaDefecto);
+
+        filas.push({
+            nombre: nombre.slice(0, 300),
+            categoria, precio, moneda,
+            incluye_iva: !!incluyeIva,
+            unidad: 'Und', activo: true, orden: filas.length,
+            actualizado: new Date()
+        });
+    });
+
+    return filas;
+}
+
+api.get('/catalogo', async (req, res, next) => {
+    try {
+        const filtro = {};
+        if (req.query.q) {
+            const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            filtro.$or = [{ nombre: rx }, { categoria: rx }];
+        }
+        res.json(await Producto.find(filtro).sort({ orden: 1, nombre: 1 }).limit(1000).lean());
+    } catch (e) { next(e); }
+});
+
+/** Guarda el catálogo completo tal como quedó en pantalla. */
+api.put('/catalogo', async (req, res, next) => {
+    try {
+        const lista = (Array.isArray(req.body.productos) ? req.body.productos : []).slice(0, 1000)
+            .map((x, i) => ({
+                nombre: txt(x.nombre, 300),
+                categoria: txt(x.categoria, 80) || 'General',
+                unidad: txt(x.unidad, 20) || 'Und',
+                precio: Math.max(0, num(x.precio)),
+                moneda: ['$', '€'].includes(x.moneda) ? x.moneda : '€',
+                incluye_iva: !!x.incluye_iva,
+                activo: x.activo !== false,
+                orden: i,
+                actualizado: new Date()
+            }))
+            .filter(x => x.nombre);
+
+        await Producto.deleteMany({});
+        if (lista.length) await Producto.insertMany(lista);
+        res.json({ ok: true, total: lista.length });
+    } catch (e) { next(e); }
+});
+
+/** Importa pegando la lista de precios (texto copiado de la web). */
+api.post('/catalogo/importar', async (req, res, next) => {
+    try {
+        const filas = interpretarLista(req.body.texto, req.body.moneda === '$' ? '$' : '€', req.body.incluye_iva);
+        if (!filas.length) return res.status(400).json({ error: 'No se reconoció ningún producto en el texto pegado.' });
+
+        if (req.body.modo === 'reemplazar') await Producto.deleteMany({});
+        const desde = await Producto.countDocuments();
+        filas.forEach((f, i) => { f.orden = desde + i; });
+        await Producto.insertMany(filas);
+
+        res.json({ ok: true, importados: filas.length });
+    } catch (e) { next(e); }
+});
+
 /* --- Listado con búsqueda, filtro y paginación --- */
 api.get('/presupuestos', async (req, res, next) => {
     try {
@@ -181,6 +300,8 @@ api.get('/presupuestos', async (req, res, next) => {
         const limite = Math.min(100, Math.max(5, parseInt(req.query.limite, 10) || 20));
         const filtro = {};
 
+        if (req.query.tipo === 'nota_entrega') filtro.tipo = 'nota_entrega';
+        else if (req.query.tipo === 'cotizacion') filtro.tipo = { $ne: 'nota_entrega' };
         if (req.query.estado) filtro.estado = req.query.estado;
         if (req.query.q) {
             const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -203,7 +324,9 @@ api.post('/presupuestos', async (req, res, next) => {
         const datos = normalizar(req.body, cfg);
         if (!datos.items.length) return res.status(400).json({ error: 'Agrega al menos un ítem.' });
 
-        datos.numero = await siguienteNumero(cfg.prefijo);
+        datos.numero = datos.tipo === 'nota_entrega'
+            ? await siguienteNumero(cfg.prefijo_nota || 'NE', 'nota_entrega')
+            : await siguienteNumero(cfg.prefijo, 'cotizacion');
         datos.fecha = parseFecha(req.body.fecha);
 
         const nuevo = await Presupuesto.create(datos);
@@ -227,6 +350,7 @@ api.put('/presupuestos/:id', async (req, res, next) => {
         const datos = normalizar(req.body, cfg);
         if (!datos.items.length) return res.status(400).json({ error: 'Agrega al menos un ítem.' });
         if (req.body.fecha) datos.fecha = parseFecha(req.body.fecha);
+        delete datos.origen;   // el origen se fija al convertir y no se modifica
 
         const p = await Presupuesto.findByIdAndUpdate(req.params.id, datos, { new: true });
         if (!p) return res.status(404).json({ error: 'No encontrado' });
@@ -237,7 +361,7 @@ api.put('/presupuestos/:id', async (req, res, next) => {
 /* --- Cambiar solo el estado --- */
 api.patch('/presupuestos/:id/estado', async (req, res, next) => {
     try {
-        const estados = ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'];
+        const estados = ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado', 'entregada', 'pagada'];
         if (!estados.includes(req.body.estado)) return res.status(400).json({ error: 'Estado inválido' });
         const p = await Presupuesto.findByIdAndUpdate(
             req.params.id, { estado: req.body.estado, actualizado: new Date() }, { new: true }
@@ -255,13 +379,43 @@ api.post('/presupuestos/:id/duplicar', async (req, res, next) => {
         if (!orig) return res.status(404).json({ error: 'No encontrado' });
 
         delete orig._id; delete orig.__v;
-        orig.numero = await siguienteNumero(cfg.prefijo);
+        orig.numero = orig.tipo === 'nota_entrega'
+            ? await siguienteNumero(cfg.prefijo_nota || 'NE', 'nota_entrega')
+            : await siguienteNumero(cfg.prefijo, 'cotizacion');
         orig.estado = 'borrador';
         orig.fecha = new Date();
         orig.actualizado = new Date();
 
         const copia = await Presupuesto.create(orig);
         res.status(201).json(copia);
+    } catch (e) { next(e); }
+});
+
+/* --- Convertir una cotización en nota de entrega --- */
+api.post('/presupuestos/:id/convertir', async (req, res, next) => {
+    try {
+        const cfg = await obtenerConfig();
+        const orig = await Presupuesto.findById(req.params.id).lean();
+        if (!orig) return res.status(404).json({ error: 'No encontrado' });
+        if (orig.tipo === 'nota_entrega') {
+            return res.status(400).json({ error: 'Este documento ya es una nota de entrega.' });
+        }
+
+        const numeroOrigen = orig.numero;
+        delete orig._id; delete orig.__v;
+
+        orig.tipo = 'nota_entrega';
+        orig.origen = { id: String(req.params.id), numero: numeroOrigen || '' };
+        orig.numero = await siguienteNumero(cfg.prefijo_nota || 'NE', 'nota_entrega');
+        orig.estado = 'borrador';
+        orig.fecha = new Date();
+        orig.actualizado = new Date();
+        orig.validez_dias = 0;
+        // El detalle de los procesos se escribe al editar la nota.
+        orig.trabajo_realizado = '';
+
+        const nota = await Presupuesto.create(orig);
+        res.status(201).json(nota);
     } catch (e) { next(e); }
 });
 
@@ -283,7 +437,8 @@ api.get('/presupuestos/:id/pdf', async (req, res, next) => {
         ]);
         if (!p) return res.status(404).send('El presupuesto no existe.');
 
-        const nombre = `Cotizacion-${(p.numero || 'SN').replace(/[^\w-]/g, '')}.pdf`;
+        const prefijoArchivo = p.tipo === 'nota_entrega' ? 'Nota-Entrega' : 'Cotizacion';
+        const nombre = `${prefijoArchivo}-${(p.numero || 'SN').replace(/[^\w-]/g, '')}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition',
             `${req.query.descargar === '1' ? 'attachment' : 'inline'}; filename="${nombre}"`);

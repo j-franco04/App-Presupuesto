@@ -44,11 +44,29 @@ const MetodoPagoSnapshot = new mongoose.Schema({
    --------------------------------------------------------------- */
 const PresupuestoSchema = new mongoose.Schema({
     numero: { type: String, index: true },
+
+    // 'cotizacion' = oferta previa | 'nota_entrega' = documento de cobro al terminar
+    tipo: {
+        type: String,
+        enum: ['cotizacion', 'nota_entrega'],
+        default: 'cotizacion',
+        index: true
+    },
+
     estado: {
         type: String,
-        enum: ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'],
+        enum: ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado', 'entregada', 'pagada'],
         default: 'borrador',
         index: true
+    },
+
+    // Solo para notas de entrega: detalle de los procesos ejecutados
+    trabajo_realizado: { type: String, default: '' },
+
+    // Cotización de la que proviene la nota (si viene de una)
+    origen: {
+        id: { type: String, default: '' },
+        numero: { type: String, default: '' }
     },
 
     cliente: {
@@ -109,6 +127,7 @@ const ConfigSchema = new mongoose.Schema({
         web:       { type: String, default: '' }
     },
     prefijo:        { type: String, default: 'AB' },
+    prefijo_nota:   { type: String, default: 'NE' },
     iva_porcentaje: { type: Number, default: 16 },
     validez_dias:   { type: Number, default: 15 },
     moneda_defecto: { type: String, default: '$' },
@@ -119,17 +138,34 @@ const ConfigSchema = new mongoose.Schema({
         default: 'Los pagos realizados en Bolívares se rigen por la tasa oficial del Banco Central de Venezuela (BCV) vigente al momento del pago, calculada sobre la base de {moneda}.'
     },
     metodos_pago: [MetodoPagoSchema]
-}, { minimize: false, collection: 'ab_config' });
+}, { minimize: false });
 
 /* ---------------------------------------------------------------
-   5. CONTADOR DE NUMERACIÓN (evita folios repetidos)
+   5. CATÁLOGO DE PRODUCTOS (lista de precios a2 y lo que agregues)
+   --------------------------------------------------------------- */
+const ProductoSchema = new mongoose.Schema({
+    nombre:      { type: String, default: '', index: true },
+    categoria:   { type: String, default: 'General' },
+    unidad:      { type: String, default: 'Und' },
+    precio:      { type: Number, default: 0 },
+    moneda:      { type: String, default: '€' },
+    // Los precios publicados por a2 son P.V.P. con IVA incluido.
+    incluye_iva: { type: Boolean, default: false },
+    activo:      { type: Boolean, default: true },
+    orden:       { type: Number, default: 0 },
+    actualizado: { type: Date, default: Date.now }
+}, { collection: 'ab_catalogo' });
+
+/* ---------------------------------------------------------------
+   6. CONTADOR DE NUMERACIÓN (evita folios repetidos)
    --------------------------------------------------------------- */
 const ContadorSchema = new mongoose.Schema({
     _id: String,
     seq: { type: Number, default: 0 }
-}, { collection: 'ab_contadores' });
+});
 
 const Presupuesto = mongoose.model('Presupuesto', PresupuestoSchema);
+const Producto    = mongoose.model('Producto', ProductoSchema);
 const Config      = mongoose.model('Config', ConfigSchema);
 const Contador    = mongoose.model('Contador', ContadorSchema);
 
@@ -154,16 +190,19 @@ async function obtenerConfig() {
  * Genera el siguiente número de forma atómica: AB-2026-0001
  * Nunca se repite aunque borres presupuestos o guardes dos a la vez.
  */
-async function siguienteNumero(prefijo = 'AB') {
+async function siguienteNumero(prefijo = 'AB', tipo = 'cotizacion') {
     const anio = new Date().getFullYear();
-    const id = `presupuesto-${anio}`;
+    const clave = tipo === 'nota_entrega' ? 'nota' : 'presupuesto';
+    const id = `${clave}-${anio}`;
 
     // Si el contador del año no existe, arranca desde la cantidad ya guardada.
     const existe = await Contador.findById(id);
     if (!existe) {
-        const cuantos = await Presupuesto.countDocuments({
-            fecha: { $gte: new Date(`${anio}-01-01T00:00:00Z`) }
-        });
+        const filtro = tipo === 'nota_entrega'
+            ? { tipo: 'nota_entrega' }
+            : { tipo: { $ne: 'nota_entrega' } };
+        filtro.fecha = { $gte: new Date(`${anio}-01-01T00:00:00Z`) };
+        const cuantos = await Presupuesto.countDocuments(filtro);
         try { await Contador.create({ _id: id, seq: cuantos }); } catch (e) { /* otra petición lo creó */ }
     }
 
@@ -172,6 +211,6 @@ async function siguienteNumero(prefijo = 'AB') {
 }
 
 module.exports = {
-    mongoose, Presupuesto, Config, Contador,
+    mongoose, Presupuesto, Config, Contador, Producto,
     conectar, obtenerConfig, siguienteNumero
 };
