@@ -132,6 +132,30 @@ table{width:100%; border-collapse:collapse}
 .aviso{background:var(--negro); color:#fff; padding:11px 16px; border-radius:var(--radio); font-size:13px; border-left:4px solid var(--amarillo); max-width:340px}
 .aviso.ok{border-left-color:#37D07A} .aviso.error{border-left-color:#E05252}
 
+/* ---------- Selector de tipo de documento ---------- */
+.tipos{display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid var(--linea)}
+.tipo-btn{
+  background:none; border:0; padding:10px 18px; cursor:pointer; font-size:14px; font-weight:600;
+  color:var(--gris); border-bottom:3px solid transparent; margin-bottom:-1px;
+}
+.tipo-btn.activa{color:var(--negro); border-bottom-color:var(--amarillo)}
+.chip.entregada{color:#1D4ED8; background:#E5EDFF}
+.chip.pagada{color:var(--ok); background:#E3F5EB}
+.sub-folio{display:block; font-size:10.5px; color:var(--gris); font-weight:500; letter-spacing:.2px}
+.pista{font-size:12.5px; color:var(--gris); margin:-6px 0 12px}
+
+.buscador{max-height:52vh; overflow:auto; border:1px solid var(--linea); border-radius:var(--radio)}
+.prod{display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid #F2F2EE; cursor:pointer}
+.prod:last-child{border-bottom:0}
+.prod:hover{background:#FFF8E1}
+.prod b{font-size:13.5px; font-weight:600; display:block}
+.prod small{font-size:11.5px; color:var(--gris)}
+.prod .pr{margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap}
+.cat-tit{background:#F3F3F0; padding:6px 14px; font-size:11px; font-weight:700; color:var(--gris); letter-spacing:.5px}
+.fila-prod{display:grid; grid-template-columns:2.2fr 1fr .7fr .6fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #F2F2EE}
+.fila-prod input[type=text],.fila-prod input[type=number]{padding:6px 8px; font-size:12.5px}
+.aviso-iva{background:#FFF6DA; border:1px solid #F3DDA0; padding:10px 12px; border-radius:var(--radio); font-size:12.5px; margin-bottom:12px}
+
 .vacio{text-align:center; color:var(--gris); padding:26px; font-size:13px}
 @media(max-width:960px){ main{grid-template-columns:1fr} .resumen{position:static} .c4,.c3{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media print{ #barra,#historial,.acciones,.modal{display:none} }
@@ -144,13 +168,19 @@ table{width:100%; border-collapse:collapse}
   <div class="marca">AB TECHNOLOGY BY<small>Sistema de cotizaciones</small></div>
   <div class="sep"></div>
   <div class="estado-con"><i class="punto" id="punto"></i><span id="txtCon">Conectando…</span></div>
-  <button class="btn btn-linea" onclick="nuevoPresupuesto()">Nueva cotización</button>
+  <button class="btn btn-linea" onclick="nuevoPresupuesto()">Nuevo documento</button>
   <button class="btn btn-linea" onclick="abrirConfig()">Configuración</button>
 </header>
 
 <main>
   <div class="hoja">
     <input type="hidden" id="editId">
+    <input type="hidden" id="origenNumero">
+
+    <div class="tipos">
+      <button type="button" class="tipo-btn activa" data-tipo="cotizacion" onclick="cambiarTipo('cotizacion')">Cotización</button>
+      <button type="button" class="tipo-btn" data-tipo="nota_entrega" onclick="cambiarTipo('nota_entrega')">Nota de entrega</button>
+    </div>
 
     <!-- CLIENTE -->
     <div class="bloque">
@@ -205,7 +235,7 @@ table{width:100%; border-collapse:collapse}
           <label class="campo" for="d_tasa">Tasa BCV (opcional)</label>
           <input id="d_tasa" type="number" step="0.01" min="0" placeholder="0.00">
         </div>
-        <div>
+        <div id="campoValidez">
           <label class="campo" for="d_validez">Validez (días)</label>
           <input id="d_validez" type="number" min="0" value="15">
         </div>
@@ -221,7 +251,7 @@ table{width:100%; border-collapse:collapse}
             <option value="anulado">Anulada</option>
           </select>
         </div>
-        <div>
+        <div id="campoEntrega">
           <label class="campo" for="d_entrega">Tiempo de entrega</label>
           <input id="d_entrega" placeholder="5 días hábiles después del anticipo">
         </div>
@@ -239,7 +269,15 @@ table{width:100%; border-collapse:collapse}
         <tbody id="items"></tbody>
       </table>
       <button class="btn" style="margin-top:12px" onclick="nuevaFila()">+ Agregar ítem</button>
+      <button class="btn btn-oscuro" style="margin-top:12px" onclick="abrirCatalogo()">🔍 Buscar en el catálogo</button>
       <span style="font-size:11.5px; color:var(--gris); margin-left:8px">Presiona Enter en el precio para agregar otra línea.</span>
+    </div>
+
+    <!-- TRABAJO REALIZADO (solo notas de entrega) -->
+    <div class="bloque" id="bloqueTrabajo" style="display:none">
+      <h2 class="titulo">Detalle del trabajo realizado</h2>
+      <p class="pista">Describe los procesos ejecutados. Es lo que el cliente quiere ver en la nota de entrega, aunque en la cotización lo hayas resumido.</p>
+      <textarea id="d_trabajo" rows="8" placeholder="1. Retiro del switch dañado y sustitución por uno administrable de 24 puertos.&#10;2. Recableado de 8 puntos de red en el depósito, con certificación de cada punto.&#10;3. Instalación de a2 Administrativo en tres estaciones y migración del inventario.&#10;4. Capacitación al personal (4 horas)."></textarea>
     </div>
 
     <!-- DESCUENTO E IVA -->
@@ -310,11 +348,18 @@ table{width:100%; border-collapse:collapse}
     <h2 class="titulo" style="margin:0; flex:0 0 auto">Archivo de cotizaciones</h2>
     <div class="sep" style="flex:1"></div>
     <input id="h_q" placeholder="Buscar por cliente, RIF o folio…">
+    <select id="h_tipo">
+      <option value="">Todos los documentos</option>
+      <option value="cotizacion">Solo cotizaciones</option>
+      <option value="nota_entrega">Solo notas de entrega</option>
+    </select>
     <select id="h_estado">
       <option value="">Todos los estados</option>
       <option value="borrador">Borrador</option>
       <option value="enviado">Enviada</option>
       <option value="aprobado">Aprobada</option>
+      <option value="entregada">Entregada</option>
+      <option value="pagada">Pagada</option>
       <option value="rechazado">Rechazada</option>
       <option value="anulado">Anulada</option>
     </select>
@@ -332,6 +377,22 @@ table{width:100%; border-collapse:collapse}
   </div>
 </section>
 
+<!-- MODAL BUSCADOR DE PRODUCTOS -->
+<div class="modal" id="modalCatalogo">
+  <div class="modal-caja" style="max-width:720px">
+    <div class="modal-cab">
+      <h3>Catálogo de productos</h3>
+      <button class="btn btn-linea" onclick="cerrarCatalogo()">Cerrar</button>
+    </div>
+    <div class="modal-cuerpo">
+      <input id="buscaProd" placeholder="Escribe para filtrar: hotel, punto de venta, renovación…" autocomplete="off">
+      <div id="avisoIva" class="aviso-iva" style="display:none; margin-top:12px"></div>
+      <div class="buscador" id="listaProd" style="margin-top:12px"></div>
+      <p class="pista" style="margin:12px 0 0">Haz clic en un producto para agregarlo a la cotización.</p>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONFIGURACIÓN -->
 <div class="modal" id="modalConfig">
   <div class="modal-caja">
@@ -344,6 +405,7 @@ table{width:100%; border-collapse:collapse}
         <button data-pest="empresa" class="activa" onclick="pestana('empresa')">Empresa</button>
         <button data-pest="valores" onclick="pestana('valores')">Valores por defecto</button>
         <button data-pest="pagos" onclick="pestana('pagos')">Formas de pago</button>
+        <button data-pest="catalogo" onclick="pestana('catalogo')">Catálogo</button>
         <button data-pest="conexion" onclick="pestana('conexion')">Conexión</button>
       </div>
 
@@ -359,8 +421,9 @@ table{width:100%; border-collapse:collapse}
       </div>
 
       <div class="panel-pest" id="p_valores">
-        <div class="rejilla c3">
-          <div><label class="campo">Prefijo del folio</label><input id="c_prefijo" maxlength="8"></div>
+        <div class="rejilla c4">
+          <div><label class="campo">Prefijo de cotizaciones</label><input id="c_prefijo" maxlength="8"></div>
+          <div><label class="campo">Prefijo de notas</label><input id="c_prefijo_nota" maxlength="8"></div>
           <div><label class="campo">IVA por defecto (%)</label><input id="c_iva" type="number" step="0.01"></div>
           <div><label class="campo">Validez por defecto (días)</label><input id="c_validez" type="number"></div>
         </div>
@@ -378,6 +441,44 @@ table{width:100%; border-collapse:collapse}
       <div class="panel-pest" id="p_pagos">
         <div id="listaMetodosCfg"></div>
         <button class="btn" onclick="agregarMetodoCfg()">+ Agregar forma de pago</button>
+      </div>
+
+      <div class="panel-pest" id="p_catalogo">
+        <div class="aviso-iva">
+          <b>Importar la lista de a2:</b> abre
+          <span style="text-decoration:underline">a2.com.ve/productos/lista-de-precios</span>,
+          selecciona la tabla completa, cópiala (Ctrl+C) y pégala aquí abajo. La app reconoce
+          nombres, precios y categorías sola.
+        </div>
+        <textarea id="pegarLista" rows="5" placeholder="a2 Punto de Venta Configurable&#9;€152,31&#10;a2 Contabilidad&#9;€358,46"></textarea>
+        <div class="rejilla c4" style="margin-top:10px; align-items:end">
+          <div>
+            <label class="campo">Al importar</label>
+            <select id="modoImport">
+              <option value="agregar">Agregar a lo que ya existe</option>
+              <option value="reemplazar">Reemplazar todo el catálogo</option>
+            </select>
+          </div>
+          <div>
+            <label class="campo">Moneda</label>
+            <select id="monedaImport"><option value="€">€ Euros</option><option value="$">$ Dólares</option></select>
+          </div>
+          <div class="interruptor"><input type="checkbox" id="ivaImport" checked><label for="ivaImport">Precios con IVA incluido</label></div>
+          <button class="btn btn-oscuro" onclick="importarLista()">Importar</button>
+        </div>
+
+        <hr style="border:0; border-top:1px solid var(--linea); margin:20px 0">
+
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+          <b style="font-size:13px" id="totalCat">Productos</b>
+          <div style="flex:1"></div>
+          <button class="btn btn-mini" onclick="agregarProdCfg()">+ Agregar producto</button>
+          <button class="btn btn-oscuro" onclick="guardarCatalogo()">Guardar catálogo</button>
+        </div>
+        <div class="fila-prod" style="font-size:11px; color:var(--gris); font-weight:700; border-bottom:1px solid var(--linea)">
+          <span>NOMBRE</span><span>CATEGORÍA</span><span>PRECIO</span><span>MONEDA</span><span></span>
+        </div>
+        <div id="listaCatCfg" style="max-height:38vh; overflow:auto"></div>
       </div>
 
       <div class="panel-pest" id="p_conexion">
@@ -446,6 +547,16 @@ function urlPDF(id, descargar){
    ======================================================= */
 let CFG = null;
 let SIN_CARGAR = false;
+let TIPO = 'cotizacion';
+let CATALOGO = [];
+
+const ESTADOS = {
+  cotizacion:   [['borrador','Borrador'],['enviado','Enviada al cliente'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']],
+  nota_entrega: [['borrador','Borrador'],['entregada','Entregada'],['pagada','Pagada'],['anulado','Anulada']]
+};
+const ETIQUETA_ESTADO = {borrador:'Borrador', enviado:'Enviada', aprobado:'Aprobada',
+  rechazado:'Rechazada', anulado:'Anulada', entregada:'Entregada', pagada:'Pagada'};
+const esNota = () => TIPO === 'nota_entrega';
 let PAGINA = 1, PAGINAS = 1;
 
 const $ = id => document.getElementById(id);
@@ -466,6 +577,29 @@ function aviso(msg, tipo){
 function conexion(ok, texto){
   $('punto').className = 'punto ' + (ok ? 'on' : 'off');
   $('txtCon').textContent = texto;
+}
+
+function pintarEstados(select, tipo, valor){
+  const lista = ESTADOS[tipo] || ESTADOS.cotizacion;
+  select.innerHTML = '';
+  lista.forEach(([v,t]) => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = t; select.appendChild(o);
+  });
+  select.value = lista.some(e => e[0] === valor) ? valor : 'borrador';
+}
+
+function cambiarTipo(t){ TIPO = t; aplicarTipo(); }
+
+function aplicarTipo(){
+  const nota = esNota();
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.toggle('activa', b.dataset.tipo === TIPO));
+  $('campoValidez').style.display = nota ? 'none' : '';
+  $('campoEntrega').style.display = nota ? 'none' : '';
+  $('bloqueTrabajo').style.display = nota ? 'block' : 'none';
+  pintarEstados($('d_estado'), TIPO, $('d_estado').value);
+  $('btnGuardar').textContent = ($('editId').value ? 'Actualizar ' : 'Guardar ') +
+    (nota ? 'nota de entrega' : 'cotización');
 }
 
 /* =======================================================
@@ -556,6 +690,8 @@ function recalcular(){
    ======================================================= */
 function recolectar(){
   return {
+    tipo: TIPO,
+    trabajo_realizado: esNota() ? $('d_trabajo').value.trim() : '',
     estado: $('d_estado').value,
     fecha: $('d_fecha').value || hoyISO(),
     cliente: {
@@ -595,20 +731,22 @@ async function guardar(){
       method: id ? 'PUT' : 'POST',
       body: JSON.stringify(datos)
     });
-    aviso(id ? 'Cotización actualizada.' : 'Cotización ' + res.numero + ' guardada.', 'ok');
+    const nombreDoc = esNota() ? 'Nota de entrega' : 'Cotización';
+    aviso(id ? nombreDoc + ' actualizada.' : nombreDoc + ' ' + res.numero + ' guardada.', 'ok');
     nuevoPresupuesto();
     cargarHistorial();
   } catch (e) {
     aviso('No se pudo guardar: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = $('editId').value ? 'Actualizar cotización' : 'Guardar cotización';
+    aplicarTipo();
   }
 }
 
 function nuevoPresupuesto(){
   $('editId').value = '';
-  ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa'].forEach(i => $(i).value = '');
+  ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo','origenNumero']
+    .forEach(i => $(i).value = '');
   $('d_fecha').value = hoyISO();
   $('d_estado').value = 'borrador';
   $('d_desc_tipo').value = 'porcentaje';
@@ -620,7 +758,7 @@ function nuevoPresupuesto(){
   $('items').innerHTML = '';
   aplicarDefectos();
   nuevaFila();
-  $('btnGuardar').textContent = 'Guardar cotización';
+  aplicarTipo();
   $('btnCancelar').style.display = 'none';
   $('avisoEdicion').style.display = 'none';
   document.querySelectorAll('.mp-check').forEach(c => c.checked = c.dataset.activo === 'true');
@@ -641,6 +779,9 @@ async function editar(id){
   try {
     const p = await api('/presupuestos/' + id);
     $('editId').value = p._id;
+    TIPO = p.tipo === 'nota_entrega' ? 'nota_entrega' : 'cotizacion';
+    $('d_trabajo').value = p.trabajo_realizado || '';
+    $('origenNumero').value = (p.origen && p.origen.numero) || '';
     const c = p.cliente || {};
     $('cl_nombre').value = c.nombre || ''; $('cl_rif').value = c.rif || '';
     $('cl_direccion').value = c.direccion || ''; $('cl_telefono').value = c.telefono || '';
@@ -650,7 +791,8 @@ async function editar(id){
     $('d_moneda').value = p.moneda === '€' ? '€' : '$';
     $('d_tasa').value = p.tasa_bcv || '';
     $('d_validez').value = p.validez_dias ?? 15;
-    $('d_estado').value = p.estado || 'borrador';
+    aplicarTipo();
+    pintarEstados($('d_estado'), TIPO, p.estado || 'borrador');
     $('d_entrega').value = p.tiempo_entrega || '';
     $('d_desc_tipo').value = p.descuento_tipo || 'porcentaje';
     $('d_desc_valor').value = p.descuento_valor || 0;
@@ -674,10 +816,11 @@ async function editar(id){
     (p.items || []).forEach(nuevaFila);
     if (!$('items').children.length) nuevaFila();
 
-    $('btnGuardar').textContent = 'Actualizar cotización';
+    aplicarTipo();
     $('btnCancelar').style.display = 'block';
     $('avisoEdicion').style.display = 'block';
-    $('avisoEdicion').textContent = 'Estás editando la cotización ' + (p.numero || '');
+    $('avisoEdicion').textContent = 'Editando ' + (esNota() ? 'la nota de entrega ' : 'la cotización ') +
+      (p.numero || '') + ($('origenNumero').value ? ' · proviene de ' + $('origenNumero').value : '');
     recalcular();
     window.scrollTo({top:0, behavior:'smooth'});
   } catch (e) { aviso('No se pudo abrir: ' + e.message, 'error'); }
@@ -694,7 +837,8 @@ async function cargarHistorial(){
   try {
     const q = encodeURIComponent($('h_q').value.trim());
     const est = $('h_estado').value;
-    const r = await api(`/presupuestos?pagina=${PAGINA}&limite=15&q=${q}&estado=${est}`);
+    const tip = $('h_tipo').value;
+    const r = await api(`/presupuestos?pagina=${PAGINA}&limite=15&q=${q}&estado=${est}&tipo=${tip}`);
     PAGINAS = r.paginas;
     cuerpo.innerHTML = '';
 
@@ -712,7 +856,13 @@ async function cargarHistorial(){
         if (clase) td.className = clase;
         td.textContent = texto; tr.appendChild(td); return td;
       };
-      celda(p.numero || 'S/N').style.fontWeight = '700';
+      const notaFila = p.tipo === 'nota_entrega';
+      const tdFolio = celda(p.numero || 'S/N');
+      tdFolio.style.fontWeight = '700';
+      const sf = document.createElement('small');
+      sf.className = 'sub-folio';
+      sf.textContent = notaFila ? 'Nota de entrega' : 'Cotización';
+      tdFolio.appendChild(sf);
       celda(new Date(p.fecha).toLocaleDateString('es-VE'));
       const tdCli = celda((p.cliente && p.cliente.nombre) || 'Sin cliente');
       if (p.cliente && p.cliente.rif){
@@ -724,7 +874,7 @@ async function cargarHistorial(){
       const tdEst = document.createElement('td');
       const chip = document.createElement('span');
       chip.className = 'chip ' + (p.estado || 'borrador');
-      chip.textContent = ({borrador:'Borrador', enviado:'Enviada', aprobado:'Aprobada', rechazado:'Rechazada', anulado:'Anulada'})[p.estado] || 'Borrador';
+      chip.textContent = ETIQUETA_ESTADO[p.estado] || 'Borrador';
       tdEst.appendChild(chip); tr.appendChild(tdEst);
 
       celda(money(p.total, p.moneda), 'num').style.fontWeight = '600';
@@ -738,14 +888,13 @@ async function cargarHistorial(){
       };
       boton('PDF', () => window.open(urlPDF(p._id), '_blank'));
       boton('Editar', () => editar(p._id));
+      if (!notaFila) boton('→ Nota', () => convertir(p._id, p.numero));
       boton('Duplicar', () => duplicar(p._id));
       boton('Borrar', () => borrar(p._id, p.numero), 'btn-rojo');
 
       const sel = document.createElement('select');
       sel.className = 'btn-mini'; sel.style.cssText = 'width:auto;padding:4px';
-      [['borrador','Borrador'],['enviado','Enviada'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']]
-        .forEach(([v,t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
-      sel.value = p.estado || 'borrador';
+      pintarEstados(sel, notaFila ? 'nota_entrega' : 'cotizacion', p.estado || 'borrador');
       sel.onchange = () => cambiarEstado(p._id, sel.value);
       grupo.appendChild(sel);
 
@@ -777,6 +926,17 @@ async function cambiarEstado(id, estado){
     aviso('Estado actualizado.', 'ok'); cargarHistorial();
   } catch(e){ aviso('Error: ' + e.message, 'error'); }
 }
+async function convertir(id, numero){
+  if (!confirm('¿Crear una nota de entrega a partir de la cotización ' + (numero || '') + '?\n\n' +
+               'Se abrirá para que escribas el detalle del trabajo realizado. La cotización original no se modifica.')) return;
+  try {
+    const n = await api('/presupuestos/' + id + '/convertir', {method:'POST'});
+    aviso('Nota de entrega ' + n.numero + ' creada.', 'ok');
+    cargarHistorial();
+    editar(n._id);
+  } catch(e){ aviso('Error: ' + e.message, 'error'); }
+}
+
 async function duplicar(id){
   try { const c = await api('/presupuestos/' + id + '/duplicar', {method:'POST'});
     aviso('Copia creada: ' + c.numero, 'ok'); cargarHistorial();
@@ -789,6 +949,192 @@ async function borrar(id, numero){
     if ($('editId').value === id) nuevoPresupuesto();
     cargarHistorial();
   } catch(e){ aviso('Error: ' + e.message, 'error'); }
+}
+
+/* =======================================================
+   5b. CATÁLOGO DE PRODUCTOS
+   ======================================================= */
+async function cargarCatalogo(){
+  try { CATALOGO = await api('/catalogo'); } catch(e){ CATALOGO = []; }
+}
+
+function abrirCatalogo(){
+  if (!CATALOGO.length){
+    aviso('El catálogo está vacío. Cárgalo en Configuración → Catálogo.', 'error');
+    return abrirConfig('catalogo');
+  }
+  $('buscaProd').value = '';
+  pintarBuscador('');
+  $('modalCatalogo').classList.add('abierto');
+  setTimeout(() => $('buscaProd').focus(), 50);
+}
+function cerrarCatalogo(){ $('modalCatalogo').classList.remove('abierto'); }
+
+/**
+ * Los precios de a2 vienen con IVA incluido. Si la cotización lleva IVA aparte,
+ * insertar el precio tal cual cobraría el impuesto dos veces: por eso se
+ * descuenta antes de cargarlo en la línea.
+ */
+function precioParaLinea(prod){
+  const conIva = $('d_con_iva').checked;
+  const pct = parseFloat($('d_iva_pct').value) || 0;
+  if (prod.incluye_iva && conIva && pct > 0){
+    return Math.round((prod.precio / (1 + pct/100)) * 100) / 100;
+  }
+  return prod.precio;
+}
+
+function pintarBuscador(filtro){
+  const cont = $('listaProd');
+  cont.innerHTML = '';
+  const f = (filtro || '').toLowerCase().trim();
+  const lista = CATALOGO.filter(p => p.activo !== false &&
+    (!f || (p.nombre + ' ' + (p.categoria||'')).toLowerCase().includes(f)));
+
+  const conIva = $('d_con_iva').checked;
+  const hayConIva = lista.some(p => p.incluye_iva);
+  $('avisoIva').style.display = hayConIva ? 'block' : 'none';
+  $('avisoIva').textContent = conIva
+    ? 'Estos precios traen el IVA incluido y la cotización tiene IVA activado, así que al agregarlos se carga el precio sin IVA para no cobrarlo dos veces.'
+    : 'Ojo: estos precios ya traen el IVA incluido. Si activas "Aplicar IVA" en la cotización, quedaría cobrado dos veces.';
+
+  if (!lista.length){
+    const v = document.createElement('div');
+    v.className = 'vacio'; v.textContent = 'Ningún producto coincide.';
+    cont.appendChild(v); return;
+  }
+
+  let catActual = null;
+  lista.slice(0, 300).forEach(p => {
+    if (p.categoria !== catActual){
+      catActual = p.categoria;
+      const t = document.createElement('div');
+      t.className = 'cat-tit'; t.textContent = catActual || 'General';
+      cont.appendChild(t);
+    }
+    const fila = document.createElement('div');
+    fila.className = 'prod';
+    const izq = document.createElement('div');
+    const b = document.createElement('b'); b.textContent = p.nombre;
+    izq.appendChild(b);
+    if (p.incluye_iva){
+      const sm = document.createElement('small'); sm.textContent = 'Precio con IVA incluido';
+      izq.appendChild(sm);
+    }
+    const pr = document.createElement('span');
+    pr.className = 'pr'; pr.textContent = (p.moneda || '€') + ' ' + nf(p.precio);
+    fila.appendChild(izq); fila.appendChild(pr);
+    fila.onclick = () => agregarDesdeCatalogo(p);
+    cont.appendChild(fila);
+  });
+}
+
+function agregarDesdeCatalogo(prod){
+  // Si la primera línea está vacía, se aprovecha en lugar de crear otra.
+  const filas = Array.from($('items').children);
+  const vacia = filas.find(tr => !tr.querySelector('.i-prod').value.trim() &&
+                                 !parseFloat(tr.querySelector('.i-prec').value));
+  const precio = precioParaLinea(prod);
+
+  if (vacia){
+    vacia.querySelector('.i-prod').value = prod.nombre;
+    vacia.querySelector('.i-unid').value = prod.unidad || 'Und';
+    vacia.querySelector('.i-cant').value = 1;
+    vacia.querySelector('.i-prec').value = precio;
+  } else {
+    nuevaFila({producto: prod.nombre, unidad: prod.unidad || 'Und', cantidad: 1, precio});
+  }
+
+  if (prod.moneda && prod.moneda !== $('d_moneda').value){
+    aviso('El producto está en ' + prod.moneda + ' y la cotización en ' + $('d_moneda').value + '. Revisa el precio.', 'error');
+  }
+  recalcular();
+  aviso('Agregado: ' + prod.nombre, 'ok');
+}
+
+/* ---------- Administración del catálogo ---------- */
+function filaProdCfg(p){
+  const d = document.createElement('div');
+  d.className = 'fila-prod';
+  const inp = (clase, valor, tipo) => {
+    const i = document.createElement('input');
+    i.type = tipo || 'text'; i.value = valor == null ? '' : valor; i.className = 'pc-' + clase;
+    if (tipo === 'number'){ i.step = '0.01'; i.min = '0'; }
+    return i;
+  };
+  d.appendChild(inp('nombre', p.nombre));
+  d.appendChild(inp('categoria', p.categoria || 'General'));
+  d.appendChild(inp('precio', p.precio || 0, 'number'));
+
+  const sel = document.createElement('select');
+  sel.className = 'pc-moneda';
+  ['€','$'].forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o); });
+  sel.value = p.moneda || '€';
+  d.appendChild(sel);
+
+  const acc = document.createElement('div');
+  acc.style.cssText = 'display:flex; gap:6px; align-items:center';
+  const iva = document.createElement('input');
+  iva.type = 'checkbox'; iva.className = 'pc-iva'; iva.checked = p.incluye_iva !== false ? !!p.incluye_iva : false;
+  iva.title = 'El precio incluye IVA';
+  const lab = document.createElement('span'); lab.style.cssText = 'font-size:11px;color:var(--gris)'; lab.textContent = 'IVA';
+  const del = document.createElement('button');
+  del.className = 'btn btn-mini btn-rojo'; del.textContent = '✕';
+  del.onclick = () => { d.remove(); contarCat(); };
+  acc.appendChild(iva); acc.appendChild(lab); acc.appendChild(del);
+  d.appendChild(acc);
+  return d;
+}
+
+function contarCat(){
+  $('totalCat').textContent = $('listaCatCfg').children.length + ' productos en el catálogo';
+}
+function pintarCatalogoCfg(){
+  const cont = $('listaCatCfg');
+  cont.innerHTML = '';
+  CATALOGO.forEach(p => cont.appendChild(filaProdCfg(p)));
+  contarCat();
+}
+function agregarProdCfg(){
+  $('listaCatCfg').appendChild(filaProdCfg({categoria:'General', moneda:'€'}));
+  contarCat();
+}
+
+async function guardarCatalogo(){
+  const productos = Array.from($('listaCatCfg').children).map(d => ({
+    nombre: d.querySelector('.pc-nombre').value.trim(),
+    categoria: d.querySelector('.pc-categoria').value.trim() || 'General',
+    precio: parseFloat(d.querySelector('.pc-precio').value) || 0,
+    moneda: d.querySelector('.pc-moneda').value,
+    incluye_iva: d.querySelector('.pc-iva').checked,
+    unidad: 'Und', activo: true
+  })).filter(p => p.nombre);
+
+  try {
+    const r = await api('/catalogo', {method:'PUT', body: JSON.stringify({productos})});
+    await cargarCatalogo();
+    pintarCatalogoCfg();
+    aviso('Catálogo guardado: ' + r.total + ' productos.', 'ok');
+  } catch(e){ aviso('No se pudo guardar: ' + e.message, 'error'); }
+}
+
+async function importarLista(){
+  const texto = $('pegarLista').value.trim();
+  if (!texto) return aviso('Pega primero la lista de precios.', 'error');
+  if ($('modoImport').value === 'reemplazar' &&
+      !confirm('Esto borra todo el catálogo actual y carga solo lo que pegaste. ¿Continuar?')) return;
+
+  try {
+    const r = await api('/catalogo/importar', {method:'POST', body: JSON.stringify({
+      texto, modo: $('modoImport').value,
+      moneda: $('monedaImport').value,
+      incluye_iva: $('ivaImport').checked
+    })});
+    $('pegarLista').value = '';
+    await cargarCatalogo();
+    pintarCatalogoCfg();
+    aviso('Importados ' + r.importados + ' productos.', 'ok');
+  } catch(e){ aviso('No se pudo importar: ' + e.message, 'error'); }
 }
 
 /* =======================================================
@@ -879,7 +1225,8 @@ function abrirConfig(pest){
   $('e_nombre').value = CFG.empresa.nombre || ''; $('e_rif').value = CFG.empresa.rif || '';
   $('e_tel').value = CFG.empresa.telefono || ''; $('e_email').value = CFG.empresa.email || '';
   $('e_web').value = CFG.empresa.web || ''; $('e_dir').value = CFG.empresa.direccion || '';
-  $('c_prefijo').value = CFG.prefijo || 'AB'; $('c_iva').value = CFG.iva_porcentaje ?? 16;
+  $('c_prefijo').value = CFG.prefijo || 'AB';
+  $('c_prefijo_nota').value = CFG.prefijo_nota || 'NE'; $('c_iva').value = CFG.iva_porcentaje ?? 16;
   $('c_validez').value = CFG.validez_dias ?? 15; $('c_moneda').value = CFG.moneda_defecto || '$';
   $('c_cond').value = CFG.condiciones_pago_defecto || ''; $('c_entrega').value = CFG.tiempo_entrega_defecto || '';
   $('c_nota').value = CFG.nota_bcv || '';
@@ -887,6 +1234,7 @@ function abrirConfig(pest){
   $('con_url').placeholder = 'En uso ahora: ' + baseURL();
   $('con_key').value = Guardado.getItem('ab_api_key') || '';
 
+  pintarCatalogoCfg();
   $('listaMetodosCfg').innerHTML = '';
   (CFG.metodos_pago || []).forEach(m => $('listaMetodosCfg').appendChild(filaMetodoCfg(m)));
 
@@ -941,6 +1289,7 @@ async function guardarConfig(){
         web: $('e_web').value.trim(), direccion: $('e_dir').value.trim()
       },
       prefijo: $('c_prefijo').value.trim(),
+      prefijo_nota: $('c_prefijo_nota').value.trim(),
       iva_porcentaje: parseFloat($('c_iva').value) || 0,
       validez_dias: parseInt($('c_validez').value, 10) || 15,
       moneda_defecto: $('c_moneda').value,
@@ -976,16 +1325,20 @@ async function iniciar(){
   });
   $('h_q').addEventListener('input', buscarConRetardo);
   $('h_estado').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
+  $('h_tipo').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
+  $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's'){ e.preventDefault(); guardar(); }
-    if (e.key === 'Escape') cerrarConfig();
+    if (e.key === 'Escape'){ cerrarConfig(); cerrarCatalogo(); }
   });
 
   nuevaFila();
+  aplicarTipo();
   try {
     CFG = await api('/config');
     aplicarDefectos();
     pintarMetodosFormulario();
+    await cargarCatalogo();
     conexion(true, 'Conectado');
   } catch(e){
     conexion(false, 'Sin conexión');
