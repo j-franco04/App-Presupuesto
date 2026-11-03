@@ -76,6 +76,10 @@ const PresupuestoSchema = new mongoose.Schema({
     ajustes:         { type: Number, default: 0 },
     base_imponible:  { type: Number, default: 0 },
     tasa_usada:      { type: Number, default: 0 },   // tasa con la que se convirtió a Bs
+    // Moneda en la que se escribieron los precios ('Bs', '$' o '€').
+    // El documento SIEMPRE se guarda en bolívares; esto solo sirve para
+    // volver a mostrar los montos en divisa al editar.
+    moneda_captura:  { type: String, default: 'Bs' },
 
     // Solo para notas de entrega: detalle de los procesos ejecutados
     trabajo_realizado: { type: String, default: '' },

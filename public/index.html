@@ -238,8 +238,22 @@ table{width:100%; border-collapse:collapse}
           <button class="btn btn-mini" onclick="sugerirFolio()" style="width:100%; padding:9px">Sugerir siguiente</button>
         </div>
         <div>
-          <label class="campo" for="f_tasa_usada">Tasa usada (referencia)</label>
-          <input id="f_tasa_usada" type="number" step="0.01" min="0" placeholder="0.00">
+          <label class="campo" for="f_moneda_captura">Escribir precios en</label>
+          <select id="f_moneda_captura">
+            <option value="Bs">Bs Bolívares</option>
+            <option value="$">$ Dólares</option>
+            <option value="€">€ Euros</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="rejilla c4" id="filaTasa" style="margin-top:14px; display:none">
+        <div>
+          <label class="campo" for="f_tasa_usada">Tasa de cambio (Bs por unidad)</label>
+          <input id="f_tasa_usada" type="number" step="0.0001" min="0" placeholder="238.5500">
+        </div>
+        <div style="grid-column:span 3; display:flex; align-items:end">
+          <div id="avisoTasa" class="pista" style="margin:0 0 8px"></div>
         </div>
       </div>
 
@@ -345,11 +359,11 @@ table{width:100%; border-collapse:collapse}
     <div class="bloque" id="bloqueDescuento">
       <h2 class="titulo">Descuento e impuesto</h2>
       <div class="rejilla c4">
-        <div>
+        <div id="campoDescTipo">
           <label class="campo" for="d_desc_tipo">Tipo de descuento</label>
           <select id="d_desc_tipo"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto fijo</option></select>
         </div>
-        <div>
+        <div id="campoDescValor">
           <label class="campo" for="d_desc_valor">Valor del descuento</label>
           <input id="d_desc_valor" type="number" step="0.01" min="0" value="0">
         </div>
@@ -395,6 +409,7 @@ table{width:100%; border-collapse:collapse}
       <hr>
       <div class="gran-total"><span>TOTAL</span><span id="t_total">0,00</span></div>
       <div class="bs" id="t_bs" style="display:none"></div>
+      <div class="bs" id="t_divisa" style="display:none"></div>
     </div>
     <div class="acciones">
       <button class="btn btn-primario" id="btnGuardar" onclick="guardar()">Guardar cotización</button>
@@ -692,7 +707,11 @@ function aplicarTipo(){
   $('campoEntrega').style.display = (nota || fac) ? 'none' : '';
   $('bloqueTrabajo').style.display = nota ? 'block' : 'none';
   $('bloqueFactura').style.display = fac ? 'block' : 'none';
-  $('bloqueDescuento').style.display = fac ? 'none' : '';
+  // El bloque sigue visible en facturas: ahí está el IVA. Solo se ocultan
+  // los dos campos de descuento, que el talonario no tiene.
+  $('campoDescTipo').style.display = fac ? 'none' : '';
+  $('campoDescValor').style.display = fac ? 'none' : '';
+  $('filaTasa').style.display = (fac && $('f_moneda_captura').value !== 'Bs') ? 'grid' : 'none';
 
   // La factura va siempre en bolívares, como el talonario
   $('d_moneda').value = fac ? 'Bs' : ($('d_moneda').value === 'Bs' ? '$' : $('d_moneda').value);
@@ -701,6 +720,22 @@ function aplicarTipo(){
   pintarEstados($('d_estado'), TIPO, $('d_estado').value);
   $('btnGuardar').textContent = ($('editId').value ? 'Actualizar ' : 'Guardar ') +
     (NOMBRE_TIPO[TIPO] || 'cotización').toLowerCase();
+  recalcular();
+}
+
+/** Moneda en la que se están escribiendo los precios de la factura. */
+function monedaCaptura(){ return esFactura() ? $('f_moneda_captura').value : $('d_moneda').value; }
+
+/** Cuántos bolívares vale una unidad de la moneda de captura. */
+function factorBs(){
+  if (!esFactura() || monedaCaptura() === 'Bs') return 1;
+  return parseFloat($('f_tasa_usada').value) || 0;
+}
+
+function cambiarMonedaCaptura(){
+  const enDivisa = $('f_moneda_captura').value !== 'Bs';
+  $('filaTasa').style.display = enDivisa ? 'grid' : 'none';
+  if (enDivisa && !parseFloat($('f_tasa_usada').value)) $('f_tasa_usada').focus();
   recalcular();
 }
 
@@ -764,7 +799,7 @@ function leerItems(){
 }
 
 function recalcular(){
-  const mon = $('d_moneda').value;
+  const mon = esFactura() ? 'Bs' : $('d_moneda').value;
   let bruto = 0;
   Array.from($('items').children).forEach(tr => {
     const c = parseFloat(tr.querySelector('.i-cant').value) || 0;
@@ -779,6 +814,23 @@ function recalcular(){
   let desc = 0, base, iva, total;
 
   if (fac){
+    const factor = factorBs();
+    const divisa = monedaCaptura() !== 'Bs';
+
+    // Los precios se escriben en divisa pero la factura se emite en bolívares
+    const brutoDivisa = bruto;
+    bruto = divisa ? Math.round(bruto * factor * 100) / 100 : bruto;
+
+    $('t_divisa').style.display = divisa ? 'block' : 'none';
+    $('t_divisa').textContent = divisa
+      ? (factor
+          ? 'Equivale a ' + monedaCaptura() + ' ' + nf(brutoDivisa) + ' por la tasa ' + nf(factor)
+          : 'Falta la tasa de cambio: los montos en Bs quedan en cero.')
+      : '';
+    $('avisoTasa').textContent = divisa && factor
+      ? 'Escribes en ' + monedaCaptura() + ' y la factura se emite en Bs. 1 ' + monedaCaptura() + ' = Bs ' + nf(factor) + '.'
+      : 'Indica cuántos bolívares vale 1 ' + monedaCaptura() + '.';
+
     const exento = Math.min(Math.max(0, parseFloat($('f_exento').value) || 0), bruto);
     const ajustes = parseFloat($('f_ajustes').value) || 0;
     base = bruto - exento + ajustes;
@@ -787,6 +839,7 @@ function recalcular(){
     iva = trunc(base * pct / 100);
     total = trunc(base + iva + exento);
   } else {
+    $('t_divisa').style.display = 'none';
     const tipo = $('d_desc_tipo').value;
     const valor = Math.max(0, parseFloat($('d_desc_valor').value) || 0);
     desc = tipo === 'porcentaje' ? bruto * Math.min(valor,100) / 100 : Math.min(valor, bruto);
@@ -814,6 +867,10 @@ function recalcular(){
    4. FORMULARIO
    ======================================================= */
 function recolectar(){
+  const factor = factorBs();
+  const items = leerItems().map(i => esFactura() && factor !== 1
+    ? Object.assign({}, i, {precio: Math.round(i.precio * factor * 100) / 100})
+    : i);
   return {
     tipo: TIPO,
     trabajo_realizado: esNota() ? $('d_trabajo').value.trim() : '',
@@ -837,7 +894,8 @@ function recolectar(){
     moneda: $('d_moneda').value,
     tasa_bcv: parseFloat($('d_tasa').value) || 0,
     validez_dias: parseInt($('d_validez').value, 10) || 0,
-    items: leerItems(),
+    items,
+    moneda_captura: esFactura() ? $('f_moneda_captura').value : 'Bs',
     descuento_tipo: $('d_desc_tipo').value,
     descuento_valor: parseFloat($('d_desc_valor').value) || 0,
     con_iva: $('d_con_iva').checked,
@@ -882,6 +940,7 @@ function nuevoPresupuesto(){
   ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo',
    'origenNumero','f_numero','f_control','f_referencia','f_tasa_usada'].forEach(i => $(i).value = '');
   $('f_forma').value = '';
+  $('f_moneda_captura').value = 'Bs';
   $('f_exento').value = 0;
   $('f_ajustes').value = 0;
   $('d_fecha').value = hoyISO();
@@ -926,6 +985,7 @@ async function editar(id){
     $('f_exento').value = p.exento || 0;
     $('f_ajustes').value = p.ajustes || 0;
     $('f_tasa_usada').value = p.tasa_usada || '';
+    $('f_moneda_captura').value = p.moneda_captura || 'Bs';
     $('origenNumero').value = (p.origen && p.origen.numero) || '';
     const c = p.cliente || {};
     $('cl_nombre').value = c.nombre || ''; $('cl_rif').value = c.rif || '';
@@ -958,7 +1018,12 @@ async function editar(id){
     });
 
     $('items').innerHTML = '';
-    (p.items || []).forEach(nuevaFila);
+    // Si la factura se escribió en divisa, los precios guardados en Bs
+    // se dividen entre la tasa para mostrarlos como se escribieron.
+    const divisor = (p.tipo === 'factura' && p.moneda_captura && p.moneda_captura !== 'Bs' && p.tasa_usada)
+      ? p.tasa_usada : 1;
+    (p.items || []).forEach(i => nuevaFila(divisor === 1 ? i
+      : Object.assign({}, i, {precio: Math.round((i.precio / divisor) * 100) / 100})));
     if (!$('items').children.length) nuevaFila();
 
     aplicarTipo();
@@ -1560,7 +1625,8 @@ async function iniciar(){
   $('h_estado').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('h_tipo').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
-  ['f_exento','f_ajustes'].forEach(id => $(id).addEventListener('input', recalcular));
+  ['f_exento','f_ajustes','f_tasa_usada'].forEach(id => $(id).addEventListener('input', recalcular));
+  $('f_moneda_captura').addEventListener('change', cambiarMonedaCaptura);
   $('cl_nombre').addEventListener('change', autocompletarCliente);
   $('cl_nombre').addEventListener('input', autocompletarCliente);
   document.addEventListener('keydown', e => {

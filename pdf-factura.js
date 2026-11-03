@@ -282,8 +282,9 @@ function pieLegal(doc, cfg, p, y) {
         .text(f.nota_pie || '', X0, yy + 15, { width: ANCHO, align: 'center', height: 9, ellipsis: true });
 
     if (p.tasa_usada > 0) {
+        const div = p.moneda_captura && p.moneda_captura !== 'Bs' ? p.moneda_captura : 'divisa';
         doc.fontSize(5.9).fillColor('#777777')
-            .text(`Montos convertidos a bolívares con tasa ${nf(p.tasa_usada)}.`,
+            .text(`Montos calculados a razón de Bs ${nf(p.tasa_usada)} por ${div}.`,
                 X0, yy + 25, { width: ANCHO, align: 'center', height: 9, lineBreak: false });
     }
 }

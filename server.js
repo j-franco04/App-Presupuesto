@@ -131,6 +131,7 @@ function normalizar(body, cfg) {
         exento, ajustes,
         base_imponible: esFactura ? baseFactura : subtotal,
         tasa_usada: esFactura ? Math.max(0, num(body.tasa_usada)) : 0,
+        moneda_captura: esFactura && ['$', '€', 'Bs'].includes(body.moneda_captura) ? body.moneda_captura : 'Bs',
         trabajo_realizado: tipo === 'nota_entrega' ? txt(body.trabajo_realizado, 5000) : '',
         estado: estados.includes(body.estado) ? body.estado : 'borrador',
         cliente: {
@@ -486,6 +487,7 @@ api.post('/presupuestos/:id/facturar', async (req, res, next) => {
             return res.status(400).json({ error: 'Indica la tasa para convertir los montos a bolívares.' });
         }
         const factor = orig.moneda === 'Bs' ? 1 : tasa;
+        const monedaOrigen = orig.moneda;
 
         const numeroOrigen = orig.numero;
         delete orig._id; delete orig.__v;
@@ -498,6 +500,7 @@ api.post('/presupuestos/:id/facturar', async (req, res, next) => {
         orig.estado = 'borrador';
         orig.fecha = new Date();
         orig.actualizado = new Date();
+        orig.moneda_captura = ['$', '€'].includes(monedaOrigen) ? monedaOrigen : 'Bs';
         orig.moneda = 'Bs';
         orig.tasa_usada = factor;
         orig.validez_dias = 0;
