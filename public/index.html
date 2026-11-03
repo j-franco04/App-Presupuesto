@@ -180,6 +180,7 @@ table{width:100%; border-collapse:collapse}
     <div class="tipos">
       <button type="button" class="tipo-btn activa" data-tipo="cotizacion" onclick="cambiarTipo('cotizacion')">Cotización</button>
       <button type="button" class="tipo-btn" data-tipo="nota_entrega" onclick="cambiarTipo('nota_entrega')">Nota de entrega</button>
+      <button type="button" class="tipo-btn" data-tipo="factura" onclick="cambiarTipo('factura')">Factura</button>
     </div>
 
     <!-- CLIENTE -->
@@ -220,6 +221,65 @@ table{width:100%; border-collapse:collapse}
       </div>
     </div>
 
+    <!-- DATOS DEL TALONARIO (solo facturas) -->
+    <div class="bloque" id="bloqueFactura" style="display:none">
+      <h2 class="titulo">Datos del talonario</h2>
+      <p class="pista">Copia aquí los números impresos en la factura física. El sistema no los genera: solo te sugiere el siguiente.</p>
+      <div class="rejilla c4">
+        <div>
+          <label class="campo" for="f_numero">N° de factura</label>
+          <input id="f_numero" placeholder="000012" autocomplete="off">
+        </div>
+        <div>
+          <label class="campo" for="f_control">N° de control</label>
+          <input id="f_control" placeholder="00000012" autocomplete="off">
+        </div>
+        <div style="display:flex; align-items:end">
+          <button class="btn btn-mini" onclick="sugerirFolio()" style="width:100%; padding:9px">Sugerir siguiente</button>
+        </div>
+        <div>
+          <label class="campo" for="f_tasa_usada">Tasa usada (referencia)</label>
+          <input id="f_tasa_usada" type="number" step="0.01" min="0" placeholder="0.00">
+        </div>
+      </div>
+
+      <div class="rejilla c2" style="margin-top:14px">
+        <div>
+          <label class="campo" for="f_forma">Forma de pago</label>
+          <select id="f_forma">
+            <option value="">Sin marcar</option>
+            <option value="credito">Crédito</option>
+            <option value="contado">Contado</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="cheque">Cheque</option>
+            <option value="debito">Tarjeta de débito</option>
+            <option value="tarjeta_credito">Tarjeta de crédito</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="campo" for="f_referencia">N° de referencia / detalle</label>
+          <input id="f_referencia" placeholder="004578991">
+        </div>
+      </div>
+
+      <div class="rejilla c2" style="margin-top:14px">
+        <div>
+          <label class="campo" for="f_exento">Total exento (Bs.)</label>
+          <input id="f_exento" type="number" step="0.01" min="0" value="0">
+        </div>
+        <div>
+          <label class="campo" for="f_ajustes">Ajustes (Bs.)</label>
+          <input id="f_ajustes" type="number" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="aviso-iva" style="margin-top:14px">
+        Los montos de la factura van en <b>bolívares</b>, igual que el talonario. Si conviertes una
+        cotización en dólares, la app pasa los precios a Bs con la tasa que indiques.
+      </div>
+    </div>
+
     <!-- DOCUMENTO -->
     <div class="bloque">
       <h2 class="titulo">Datos del documento</h2>
@@ -230,7 +290,7 @@ table{width:100%; border-collapse:collapse}
         </div>
         <div>
           <label class="campo" for="d_moneda">Moneda</label>
-          <select id="d_moneda"><option value="$">$ Dólares</option><option value="€">€ Euros</option></select>
+          <select id="d_moneda"><option value="$">$ Dólares</option><option value="€">€ Euros</option><option value="Bs">Bs Bolívares</option></select>
         </div>
         <div>
           <label class="campo" for="d_tasa">Tasa BCV (opcional)</label>
@@ -282,7 +342,7 @@ table{width:100%; border-collapse:collapse}
     </div>
 
     <!-- DESCUENTO E IVA -->
-    <div class="bloque">
+    <div class="bloque" id="bloqueDescuento">
       <h2 class="titulo">Descuento e impuesto</h2>
       <div class="rejilla c4">
         <div>
@@ -353,6 +413,7 @@ table{width:100%; border-collapse:collapse}
       <option value="">Todos los documentos</option>
       <option value="cotizacion">Solo cotizaciones</option>
       <option value="nota_entrega">Solo notas de entrega</option>
+      <option value="factura">Solo facturas</option>
     </select>
     <select id="h_estado">
       <option value="">Todos los estados</option>
@@ -361,6 +422,7 @@ table{width:100%; border-collapse:collapse}
       <option value="aprobado">Aprobada</option>
       <option value="entregada">Entregada</option>
       <option value="pagada">Pagada</option>
+      <option value="emitida">Emitida</option>
       <option value="rechazado">Rechazada</option>
       <option value="anulado">Anulada</option>
     </select>
@@ -407,6 +469,7 @@ table{width:100%; border-collapse:collapse}
         <button data-pest="valores" onclick="pestana('valores')">Valores por defecto</button>
         <button data-pest="pagos" onclick="pestana('pagos')">Formas de pago</button>
         <button data-pest="catalogo" onclick="pestana('catalogo')">Catálogo</button>
+        <button data-pest="talonario" onclick="pestana('talonario')">Talonario</button>
         <button data-pest="conexion" onclick="pestana('conexion')">Conexión</button>
       </div>
 
@@ -482,6 +545,31 @@ table{width:100%; border-collapse:collapse}
         <div id="listaCatCfg" style="max-height:38vh; overflow:auto"></div>
       </div>
 
+      <div class="panel-pest" id="p_talonario">
+        <p class="pista">Lo que aparece preimpreso en tu talonario. Se usa solo en el PDF de las facturas.</p>
+        <div class="rejilla c2">
+          <div><label class="campo">Eslogan bajo el nombre</label><input id="tf_eslogan"></div>
+          <div><label class="campo">Prefijo del N° de control</label><input id="tf_prefijo" maxlength="6" placeholder="00"></div>
+        </div>
+        <div style="margin-top:12px"><label class="campo">Domicilio fiscal, primera línea</label><input id="tf_dom1"></div>
+        <div style="margin-top:12px"><label class="campo">Domicilio fiscal, segunda línea</label><input id="tf_dom2"></div>
+        <div style="margin-top:12px">
+          <label class="campo">Texto legal de la imprenta (el renglón diminuto del pie)</label>
+          <textarea id="tf_imprenta" rows="3" placeholder="Cópialo tal cual del talonario: datos de la imprenta, providencia, rango de numeración…"></textarea>
+        </div>
+        <div class="rejilla c2" style="margin-top:12px">
+          <div><label class="campo">Marca de agua</label><input id="tf_leyenda"></div>
+          <div>
+            <label class="campo">Céntimos del IVA</label>
+            <select id="tf_redondeo">
+              <option value="truncar">Truncar (como en tu talonario)</option>
+              <option value="redondear">Redondear</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px"><label class="campo">Nota al pie</label><textarea id="tf_nota" rows="2"></textarea></div>
+      </div>
+
       <div class="panel-pest" id="p_conexion">
         <div><label class="campo">Dirección del servidor</label>
           <input id="con_url" placeholder="https://tu-servicio.onrender.com"></div>
@@ -554,11 +642,14 @@ let CLIENTES = [];
 
 const ESTADOS = {
   cotizacion:   [['borrador','Borrador'],['enviado','Enviada al cliente'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']],
-  nota_entrega: [['borrador','Borrador'],['entregada','Entregada'],['pagada','Pagada'],['anulado','Anulada']]
+  nota_entrega: [['borrador','Borrador'],['entregada','Entregada'],['pagada','Pagada'],['anulado','Anulada']],
+  factura:      [['borrador','Borrador'],['emitida','Emitida'],['pagada','Pagada'],['anulado','Anulada']]
 };
 const ETIQUETA_ESTADO = {borrador:'Borrador', enviado:'Enviada', aprobado:'Aprobada',
-  rechazado:'Rechazada', anulado:'Anulada', entregada:'Entregada', pagada:'Pagada'};
+  rechazado:'Rechazada', anulado:'Anulada', entregada:'Entregada', pagada:'Pagada', emitida:'Emitida'};
+const NOMBRE_TIPO = {cotizacion:'Cotización', nota_entrega:'Nota de entrega', factura:'Factura'};
 const esNota = () => TIPO === 'nota_entrega';
+const esFactura = () => TIPO === 'factura';
 let PAGINA = 1, PAGINAS = 1;
 
 const $ = id => document.getElementById(id);
@@ -594,14 +685,33 @@ function pintarEstados(select, tipo, valor){
 function cambiarTipo(t){ TIPO = t; aplicarTipo(); }
 
 function aplicarTipo(){
-  const nota = esNota();
+  const nota = esNota(), fac = esFactura();
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.toggle('activa', b.dataset.tipo === TIPO));
-  $('campoValidez').style.display = nota ? 'none' : '';
-  $('campoEntrega').style.display = nota ? 'none' : '';
+
+  $('campoValidez').style.display = (nota || fac) ? 'none' : '';
+  $('campoEntrega').style.display = (nota || fac) ? 'none' : '';
   $('bloqueTrabajo').style.display = nota ? 'block' : 'none';
+  $('bloqueFactura').style.display = fac ? 'block' : 'none';
+  $('bloqueDescuento').style.display = fac ? 'none' : '';
+
+  // La factura va siempre en bolívares, como el talonario
+  $('d_moneda').value = fac ? 'Bs' : ($('d_moneda').value === 'Bs' ? '$' : $('d_moneda').value);
+  $('d_moneda').disabled = fac;
+
   pintarEstados($('d_estado'), TIPO, $('d_estado').value);
   $('btnGuardar').textContent = ($('editId').value ? 'Actualizar ' : 'Guardar ') +
-    (nota ? 'nota de entrega' : 'cotización');
+    (NOMBRE_TIPO[TIPO] || 'cotización').toLowerCase();
+  recalcular();
+}
+
+async function sugerirFolio(){
+  try {
+    const r = await api('/siguiente-factura');
+    if (!r.numero_factura) return aviso('Aún no hay facturas cargadas: escribe los números del talonario.', 'error');
+    $('f_numero').value = r.numero_factura;
+    $('f_control').value = r.numero_control;
+    aviso('Sugerido a partir de la última factura. Verifícalo contra el talonario.', 'ok');
+  } catch(e){ aviso('No se pudo consultar: ' + e.message, 'error'); }
 }
 
 /* =======================================================
@@ -663,19 +773,32 @@ function recalcular(){
     tr.querySelector('.linea-total').textContent = nf(c * p);
   });
 
-  const tipo = $('d_desc_tipo').value;
-  const valor = Math.max(0, parseFloat($('d_desc_valor').value) || 0);
-  let desc = tipo === 'porcentaje' ? bruto * Math.min(valor,100) / 100 : Math.min(valor, bruto);
-  const base = bruto - desc;
+  const fac = esFactura();
   const conIva = $('d_con_iva').checked;
   const pct = conIva ? (parseFloat($('d_iva_pct').value) || 0) : 0;
-  const iva = base * pct / 100;
-  const total = base + iva;
+  let desc = 0, base, iva, total;
+
+  if (fac){
+    const exento = Math.min(Math.max(0, parseFloat($('f_exento').value) || 0), bruto);
+    const ajustes = parseFloat($('f_ajustes').value) || 0;
+    base = bruto - exento + ajustes;
+    // Se truncan los céntimos, igual que en el talonario escrito a mano
+    const trunc = n => Math.trunc(n * 100) / 100;
+    iva = trunc(base * pct / 100);
+    total = trunc(base + iva + exento);
+  } else {
+    const tipo = $('d_desc_tipo').value;
+    const valor = Math.max(0, parseFloat($('d_desc_valor').value) || 0);
+    desc = tipo === 'porcentaje' ? bruto * Math.min(valor,100) / 100 : Math.min(valor, bruto);
+    base = bruto - desc;
+    iva = base * pct / 100;
+    total = base + iva;
+  }
 
   $('t_bruto').textContent = money(bruto, mon);
   $('f_desc').style.display = desc > 0 ? 'flex' : 'none';
+  $('f_base').style.display = (desc > 0 || esFactura()) ? 'flex' : 'none';
   $('t_desc').textContent = '- ' + money(desc, mon);
-  $('f_base').style.display = desc > 0 ? 'flex' : 'none';
   $('t_base').textContent = money(base, mon);
   $('f_iva').style.display = conIva ? 'flex' : 'none';
   $('lbl_iva').textContent = 'IVA (' + (pct || 0) + '%)';
@@ -694,6 +817,13 @@ function recolectar(){
   return {
     tipo: TIPO,
     trabajo_realizado: esNota() ? $('d_trabajo').value.trim() : '',
+    numero_factura: $('f_numero').value.trim(),
+    numero_control: $('f_control').value.trim(),
+    forma_pago: $('f_forma').value,
+    referencia_pago: $('f_referencia').value.trim(),
+    exento: parseFloat($('f_exento').value) || 0,
+    ajustes: parseFloat($('f_ajustes').value) || 0,
+    tasa_usada: parseFloat($('f_tasa_usada').value) || 0,
     estado: $('d_estado').value,
     fecha: $('d_fecha').value || hoyISO(),
     cliente: {
@@ -733,7 +863,7 @@ async function guardar(){
       method: id ? 'PUT' : 'POST',
       body: JSON.stringify(datos)
     });
-    const nombreDoc = esNota() ? 'Nota de entrega' : 'Cotización';
+    const nombreDoc = NOMBRE_TIPO[TIPO] || 'Documento';
     aviso(id ? nombreDoc + ' actualizada.' : nombreDoc + ' ' + res.numero + ' guardada.', 'ok');
     nuevoPresupuesto();
     cargarHistorial();
@@ -749,8 +879,11 @@ async function guardar(){
 function nuevoPresupuesto(){
   ULTIMO_AUTO = null;
   $('editId').value = '';
-  ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo','origenNumero']
-    .forEach(i => $(i).value = '');
+  ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo',
+   'origenNumero','f_numero','f_control','f_referencia','f_tasa_usada'].forEach(i => $(i).value = '');
+  $('f_forma').value = '';
+  $('f_exento').value = 0;
+  $('f_ajustes').value = 0;
   $('d_fecha').value = hoyISO();
   $('d_estado').value = 'borrador';
   $('d_desc_tipo').value = 'porcentaje';
@@ -784,8 +917,15 @@ async function editar(id){
     const p = await api('/presupuestos/' + id);
     ULTIMO_AUTO = null;
     $('editId').value = p._id;
-    TIPO = p.tipo === 'nota_entrega' ? 'nota_entrega' : 'cotizacion';
+    TIPO = ['nota_entrega','factura'].includes(p.tipo) ? p.tipo : 'cotizacion';
     $('d_trabajo').value = p.trabajo_realizado || '';
+    $('f_numero').value = p.numero_factura || '';
+    $('f_control').value = p.numero_control || '';
+    $('f_forma').value = p.forma_pago || '';
+    $('f_referencia').value = p.referencia_pago || '';
+    $('f_exento').value = p.exento || 0;
+    $('f_ajustes').value = p.ajustes || 0;
+    $('f_tasa_usada').value = p.tasa_usada || '';
     $('origenNumero').value = (p.origen && p.origen.numero) || '';
     const c = p.cliente || {};
     $('cl_nombre').value = c.nombre || ''; $('cl_rif').value = c.rif || '';
@@ -793,7 +933,7 @@ async function editar(id){
     $('cl_email').value = c.email || ''; $('cl_contacto').value = c.contacto || '';
 
     $('d_fecha').value = (p.fecha || '').slice(0,10) || hoyISO();
-    $('d_moneda').value = p.moneda === '€' ? '€' : '$';
+    $('d_moneda').value = ['€','Bs'].includes(p.moneda) ? p.moneda : '$';
     $('d_tasa').value = p.tasa_bcv || '';
     $('d_validez').value = p.validez_dias ?? 15;
     aplicarTipo();
@@ -824,8 +964,8 @@ async function editar(id){
     aplicarTipo();
     $('btnCancelar').style.display = 'block';
     $('avisoEdicion').style.display = 'block';
-    $('avisoEdicion').textContent = 'Editando ' + (esNota() ? 'la nota de entrega ' : 'la cotización ') +
-      (p.numero || '') + ($('origenNumero').value ? ' · proviene de ' + $('origenNumero').value : '');
+    $('avisoEdicion').textContent = 'Editando ' + (NOMBRE_TIPO[TIPO] || '').toLowerCase() + ' ' +
+      (p.numero || 'sin folio') + ($('origenNumero').value ? ' · proviene de ' + $('origenNumero').value : '');
     recalcular();
     window.scrollTo({top:0, behavior:'smooth'});
   } catch (e) { aviso('No se pudo abrir: ' + e.message, 'error'); }
@@ -862,11 +1002,12 @@ async function cargarHistorial(){
         td.textContent = texto; tr.appendChild(td); return td;
       };
       const notaFila = p.tipo === 'nota_entrega';
+      const facturaFila = p.tipo === 'factura';
       const tdFolio = celda(p.numero || 'S/N');
       tdFolio.style.fontWeight = '700';
       const sf = document.createElement('small');
       sf.className = 'sub-folio';
-      sf.textContent = notaFila ? 'Nota de entrega' : 'Cotización';
+      sf.textContent = NOMBRE_TIPO[p.tipo] || 'Cotización';
       tdFolio.appendChild(sf);
       celda(new Date(p.fecha).toLocaleDateString('es-VE'));
       const tdCli = celda((p.cliente && p.cliente.nombre) || 'Sin cliente');
@@ -893,13 +1034,14 @@ async function cargarHistorial(){
       };
       boton('PDF', () => window.open(urlPDF(p._id), '_blank'));
       boton('Editar', () => editar(p._id));
-      if (!notaFila) boton('→ Nota', () => convertir(p._id, p.numero));
+      if (!notaFila && !facturaFila) boton('→ Nota', () => convertir(p._id, p.numero));
+      if (!facturaFila) boton('→ Factura', () => facturar(p._id, p.numero, p.moneda, p.tasa_bcv));
       boton('Duplicar', () => duplicar(p._id));
       boton('Borrar', () => borrar(p._id, p.numero), 'btn-rojo');
 
       const sel = document.createElement('select');
       sel.className = 'btn-mini'; sel.style.cssText = 'width:auto;padding:4px';
-      pintarEstados(sel, notaFila ? 'nota_entrega' : 'cotizacion', p.estado || 'borrador');
+      pintarEstados(sel, p.tipo || 'cotizacion', p.estado || 'borrador');
       sel.onchange = () => cambiarEstado(p._id, sel.value);
       grupo.appendChild(sel);
 
@@ -939,6 +1081,24 @@ async function convertir(id, numero){
     aviso('Nota de entrega ' + n.numero + ' creada.', 'ok');
     cargarHistorial();
     editar(n._id);
+  } catch(e){ aviso('Error: ' + e.message, 'error'); }
+}
+
+async function facturar(id, numero, moneda, tasaGuardada){
+  let tasa = 1;
+  if (moneda !== 'Bs'){
+    const puesta = prompt('Tasa para convertir de ' + moneda + ' a bolívares:\n\n' +
+      'Los precios de ' + (numero || 'este documento') + ' se multiplicarán por esta tasa.',
+      tasaGuardada || '');
+    if (puesta === null) return;
+    tasa = parseFloat(String(puesta).replace(',', '.'));
+    if (!tasa || tasa <= 0) return aviso('Tasa inválida.', 'error');
+  }
+  try {
+    const f = await api('/presupuestos/' + id + '/facturar', {method:'POST', body: JSON.stringify({tasa})});
+    aviso('Factura creada en borrador. Escribe los números del talonario.', 'ok');
+    cargarHistorial();
+    editar(f._id);
   } catch(e){ aviso('Error: ' + e.message, 'error'); }
 }
 
@@ -1284,6 +1444,15 @@ function abrirConfig(pest){
   $('c_validez').value = CFG.validez_dias ?? 15; $('c_moneda').value = CFG.moneda_defecto || '$';
   $('c_cond').value = CFG.condiciones_pago_defecto || ''; $('c_entrega').value = CFG.tiempo_entrega_defecto || '';
   $('c_nota').value = CFG.nota_bcv || '';
+  const tf = CFG.factura || {};
+  $('tf_eslogan').value = tf.eslogan || '';
+  $('tf_prefijo').value = tf.prefijo_control || '00';
+  $('tf_dom1').value = tf.domicilio_1 || '';
+  $('tf_dom2').value = tf.domicilio_2 || '';
+  $('tf_imprenta').value = tf.texto_imprenta || '';
+  $('tf_leyenda').value = tf.leyenda || '';
+  $('tf_nota').value = tf.nota_pie || '';
+  $('tf_redondeo').value = tf.redondeo || 'truncar';
   $('con_url').value = Guardado.getItem('ab_api_url') || '';
   $('con_url').placeholder = 'En uso ahora: ' + baseURL();
   $('con_key').value = Guardado.getItem('ab_api_key') || '';
@@ -1350,6 +1519,16 @@ async function guardarConfig(){
       condiciones_pago_defecto: $('c_cond').value.trim(),
       tiempo_entrega_defecto: $('c_entrega').value.trim(),
       nota_bcv: $('c_nota').value.trim(),
+      factura: {
+        eslogan: $('tf_eslogan').value.trim(),
+        prefijo_control: $('tf_prefijo').value.trim(),
+        domicilio_1: $('tf_dom1').value.trim(),
+        domicilio_2: $('tf_dom2').value.trim(),
+        texto_imprenta: $('tf_imprenta').value.trim(),
+        leyenda: $('tf_leyenda').value.trim(),
+        nota_pie: $('tf_nota').value.trim(),
+        redondeo: $('tf_redondeo').value
+      },
       metodos_pago: metodos
     })});
     pintarMetodosFormulario();
@@ -1381,6 +1560,7 @@ async function iniciar(){
   $('h_estado').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('h_tipo').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
   $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
+  ['f_exento','f_ajustes'].forEach(id => $(id).addEventListener('input', recalcular));
   $('cl_nombre').addEventListener('change', autocompletarCliente);
   $('cl_nombre').addEventListener('input', autocompletarCliente);
   document.addEventListener('keydown', e => {

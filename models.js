@@ -48,17 +48,34 @@ const PresupuestoSchema = new mongoose.Schema({
     // 'cotizacion' = oferta previa | 'nota_entrega' = documento de cobro al terminar
     tipo: {
         type: String,
-        enum: ['cotizacion', 'nota_entrega'],
+        enum: ['cotizacion', 'nota_entrega', 'factura'],
         default: 'cotizacion',
         index: true
     },
 
     estado: {
         type: String,
-        enum: ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado', 'entregada', 'pagada'],
+        enum: ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado',
+               'entregada', 'pagada', 'emitida'],
         default: 'borrador',
         index: true
     },
+
+    /* ----- Campos exclusivos de la FACTURA -----
+       Se copian del talonario físico: el sistema no los inventa. */
+    numero_factura: { type: String, default: '' },   // Ej: 000012
+    numero_control: { type: String, default: '' },   // Ej: 00000012 (sin el prefijo)
+    forma_pago: {
+        type: String,
+        enum: ['', 'credito', 'contado', 'efectivo', 'cheque', 'debito', 'tarjeta_credito', 'transferencia', 'otro'],
+        default: ''
+    },
+    referencia_pago: { type: String, default: '' },
+    otro_pago:       { type: String, default: '' },
+    exento:          { type: Number, default: 0 },
+    ajustes:         { type: Number, default: 0 },
+    base_imponible:  { type: Number, default: 0 },
+    tasa_usada:      { type: Number, default: 0 },   // tasa con la que se convirtió a Bs
 
     // Solo para notas de entrega: detalle de los procesos ejecutados
     trabajo_realizado: { type: String, default: '' },
@@ -128,6 +145,20 @@ const ConfigSchema = new mongoose.Schema({
     },
     prefijo:        { type: String, default: 'AB' },
     prefijo_nota:   { type: String, default: 'NE' },
+
+    // Datos que vienen preimpresos en el talonario físico
+    factura: {
+        prefijo_control: { type: String, default: '00' },
+        eslogan:         { type: String, default: 'SOLUCIONES TECNOLOGICAS INTEGRALES' },
+        domicilio_1:     { type: String, default: 'Domicilio Fiscal: Calle 107 con Av. 19B Casa N°19B-120. Barrio Pomona.' },
+        domicilio_2:     { type: String, default: 'Maracaibo Edo. Zulia Telf.:(0412)-966.96.16' },
+        texto_imprenta:  { type: String, default: '' },
+        leyenda:         { type: String, default: 'COPIA ADMINISTRATIVA · SIN VALOR FISCAL' },
+        // 'truncar' corta los céntimos sobrantes (como en tu talonario escrito a mano);
+        // 'redondear' sube cuando pasa de medio céntimo.
+        redondeo:        { type: String, enum: ['truncar', 'redondear'], default: 'truncar' },
+        nota_pie:        { type: String, default: 'Documento de uso administrativo interno. El comprobante con validez fiscal es el original impreso del talonario autorizado.' }
+    },
     iva_porcentaje: { type: Number, default: 16 },
     validez_dias:   { type: Number, default: 15 },
     moneda_defecto: { type: String, default: '$' },

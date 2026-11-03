@@ -11,6 +11,7 @@ const {
     Presupuesto, Config, Producto, conectar, obtenerConfig, siguienteNumero
 } = require('./models');
 const { generarPDF } = require('./pdf');
+const { generarFactura } = require('./pdf-factura');
 
 const app = express();
 app.use(cors());
@@ -94,14 +95,42 @@ function normalizar(body, cfg) {
             numero: m.numero, detalle: m.detalle
         }));
 
-    const moneda = ['$', '€'].includes(body.moneda) ? body.moneda : '$';
-    const tipo = body.tipo === 'nota_entrega' ? 'nota_entrega' : 'cotizacion';
-    const estados = tipo === 'nota_entrega'
-        ? ['borrador', 'entregada', 'pagada', 'anulado']
-        : ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'];
+    const tipo = ['nota_entrega', 'factura'].includes(body.tipo) ? body.tipo : 'cotizacion';
+    const esFactura = tipo === 'factura';
+
+    // La factura siempre va en bolívares, como el talonario físico
+    const moneda = esFactura ? 'Bs' : (['$', '€'].includes(body.moneda) ? body.moneda : '$');
+
+    const estados = esFactura
+        ? ['borrador', 'emitida', 'pagada', 'anulado']
+        : tipo === 'nota_entrega'
+            ? ['borrador', 'entregada', 'pagada', 'anulado']
+            : ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado'];
+
+    const formasPago = ['', 'credito', 'contado', 'efectivo', 'cheque', 'debito',
+                        'tarjeta_credito', 'transferencia', 'otro'];
+
+    /* En la factura no hay descuento: hay exento y ajustes, como en el formulario.
+       Base imponible = subtotal - exento + ajustes  */
+    const exento = esFactura ? Math.min(Math.max(0, num(body.exento)), bruto) : 0;
+    const ajustes = esFactura ? num(body.ajustes) : 0;
+    const baseFactura = r2(bruto - exento + ajustes);
+
+    // El talonario escrito a mano trunca los céntimos; se respeta ese criterio.
+    const modo = (cfg.factura && cfg.factura.redondeo) || 'truncar';
+    const ajustar = n => modo === 'truncar' ? Math.trunc(n * 100) / 100 : r2(n);
+    const ivaFactura = ajustar(baseFactura * (con_iva ? iva_porcentaje : 0) / 100);
 
     return {
         tipo,
+        numero_factura: esFactura ? txt(body.numero_factura, 20) : '',
+        numero_control: esFactura ? txt(body.numero_control, 20) : '',
+        forma_pago: esFactura && formasPago.includes(body.forma_pago) ? body.forma_pago : '',
+        referencia_pago: esFactura ? txt(body.referencia_pago, 60) : '',
+        otro_pago: esFactura ? txt(body.otro_pago, 60) : '',
+        exento, ajustes,
+        base_imponible: esFactura ? baseFactura : subtotal,
+        tasa_usada: esFactura ? Math.max(0, num(body.tasa_usada)) : 0,
         trabajo_realizado: tipo === 'nota_entrega' ? txt(body.trabajo_realizado, 5000) : '',
         estado: estados.includes(body.estado) ? body.estado : 'borrador',
         cliente: {
@@ -117,7 +146,10 @@ function normalizar(body, cfg) {
         items,
         descuento_tipo, descuento_valor, descuento_monto,
         con_iva, iva_porcentaje,
-        bruto, subtotal, iva, total,
+        bruto,
+        subtotal: esFactura ? bruto : subtotal,
+        iva: esFactura ? ivaFactura : iva,
+        total: esFactura ? ajustar(baseFactura + ivaFactura + exento) : total,
         validez_dias: Math.max(0, Math.min(365, parseInt(body.validez_dias, 10) || cfg.validez_dias || 15)),
         condiciones_pago: txt(body.condiciones_pago, 600),
         tiempo_entrega: txt(body.tiempo_entrega, 200),
@@ -153,6 +185,19 @@ api.put('/config', async (req, res, next) => {
         }
         if (b.prefijo !== undefined) cfg.prefijo = txt(b.prefijo, 8).toUpperCase() || 'AB';
         if (b.prefijo_nota !== undefined) cfg.prefijo_nota = txt(b.prefijo_nota, 8).toUpperCase() || 'NE';
+
+        if (b.factura) {
+            cfg.factura = cfg.factura || {};
+            if (b.factura.prefijo_control !== undefined) cfg.factura.prefijo_control = txt(b.factura.prefijo_control, 6);
+            if (b.factura.eslogan !== undefined) cfg.factura.eslogan = txt(b.factura.eslogan, 120);
+            if (b.factura.domicilio_1 !== undefined) cfg.factura.domicilio_1 = txt(b.factura.domicilio_1, 200);
+            if (b.factura.domicilio_2 !== undefined) cfg.factura.domicilio_2 = txt(b.factura.domicilio_2, 200);
+            if (b.factura.texto_imprenta !== undefined) cfg.factura.texto_imprenta = txt(b.factura.texto_imprenta, 1200);
+            if (b.factura.leyenda !== undefined) cfg.factura.leyenda = txt(b.factura.leyenda, 120);
+            if (b.factura.redondeo !== undefined) cfg.factura.redondeo = b.factura.redondeo === 'redondear' ? 'redondear' : 'truncar';
+            if (b.factura.nota_pie !== undefined) cfg.factura.nota_pie = txt(b.factura.nota_pie, 400);
+            cfg.markModified('factura');
+        }
         if (b.iva_porcentaje !== undefined) cfg.iva_porcentaje = Math.max(0, Math.min(100, num(b.iva_porcentaje)));
         if (b.validez_dias !== undefined) cfg.validez_dias = Math.max(0, Math.min(365, parseInt(b.validez_dias, 10) || 15));
         if (b.moneda_defecto !== undefined) cfg.moneda_defecto = ['$', '€'].includes(b.moneda_defecto) ? b.moneda_defecto : '$';
@@ -300,8 +345,8 @@ api.get('/presupuestos', async (req, res, next) => {
         const limite = Math.min(100, Math.max(5, parseInt(req.query.limite, 10) || 20));
         const filtro = {};
 
-        if (req.query.tipo === 'nota_entrega') filtro.tipo = 'nota_entrega';
-        else if (req.query.tipo === 'cotizacion') filtro.tipo = { $ne: 'nota_entrega' };
+        if (['nota_entrega', 'factura'].includes(req.query.tipo)) filtro.tipo = req.query.tipo;
+        else if (req.query.tipo === 'cotizacion') filtro.tipo = { $nin: ['nota_entrega', 'factura'] };
         if (req.query.estado) filtro.estado = req.query.estado;
         if (req.query.q) {
             const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -324,9 +369,18 @@ api.post('/presupuestos', async (req, res, next) => {
         const datos = normalizar(req.body, cfg);
         if (!datos.items.length) return res.status(400).json({ error: 'Agrega al menos un ítem.' });
 
-        datos.numero = datos.tipo === 'nota_entrega'
-            ? await siguienteNumero(cfg.prefijo_nota || 'NE', 'nota_entrega')
-            : await siguienteNumero(cfg.prefijo, 'cotizacion');
+        if (datos.tipo === 'factura') {
+            // El folio del talonario manda: el sistema no lo inventa
+            if (!datos.numero_factura) return res.status(400).json({ error: 'Escribe el número de factura del talonario.' });
+            if (!datos.numero_control) return res.status(400).json({ error: 'Escribe el número de control del talonario.' });
+            const repetida = await Presupuesto.findOne({ tipo: 'factura', numero_factura: datos.numero_factura });
+            if (repetida) return res.status(409).json({ error: `Ya existe la factura N° ${datos.numero_factura}.` });
+            datos.numero = datos.numero_factura;
+        } else {
+            datos.numero = datos.tipo === 'nota_entrega'
+                ? await siguienteNumero(cfg.prefijo_nota || 'NE', 'nota_entrega')
+                : await siguienteNumero(cfg.prefijo, 'cotizacion');
+        }
         datos.fecha = parseFecha(req.body.fecha);
 
         const nuevo = await Presupuesto.create(datos);
@@ -352,6 +406,15 @@ api.put('/presupuestos/:id', async (req, res, next) => {
         if (req.body.fecha) datos.fecha = parseFecha(req.body.fecha);
         delete datos.origen;   // el origen se fija al convertir y no se modifica
 
+        if (datos.tipo === 'factura') {
+            if (!datos.numero_factura) return res.status(400).json({ error: 'Escribe el número de factura del talonario.' });
+            const repetida = await Presupuesto.findOne({
+                tipo: 'factura', numero_factura: datos.numero_factura, _id: { $ne: req.params.id }
+            });
+            if (repetida) return res.status(409).json({ error: `Ya existe la factura N° ${datos.numero_factura}.` });
+            datos.numero = datos.numero_factura;
+        }
+
         const p = await Presupuesto.findByIdAndUpdate(req.params.id, datos, { new: true });
         if (!p) return res.status(404).json({ error: 'No encontrado' });
         res.json(p);
@@ -361,7 +424,7 @@ api.put('/presupuestos/:id', async (req, res, next) => {
 /* --- Cambiar solo el estado --- */
 api.patch('/presupuestos/:id/estado', async (req, res, next) => {
     try {
-        const estados = ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado', 'entregada', 'pagada'];
+        const estados = ['borrador', 'enviado', 'aprobado', 'rechazado', 'anulado', 'entregada', 'pagada', 'emitida'];
         if (!estados.includes(req.body.estado)) return res.status(400).json({ error: 'Estado inválido' });
         const p = await Presupuesto.findByIdAndUpdate(
             req.params.id, { estado: req.body.estado, actualizado: new Date() }, { new: true }
@@ -388,6 +451,82 @@ api.post('/presupuestos/:id/duplicar', async (req, res, next) => {
 
         const copia = await Presupuesto.create(orig);
         res.status(201).json(copia);
+    } catch (e) { next(e); }
+});
+
+/* --- Siguiente número de factura sugerido (a partir del último cargado) --- */
+api.get('/siguiente-factura', async (req, res, next) => {
+    try {
+        const cfg = await obtenerConfig();
+        const ultima = await Presupuesto.find({ tipo: 'factura' })
+            .sort({ numero_factura: -1 }).limit(1).lean();
+
+        const subir = (valor, largo) => {
+            const n = parseInt(String(valor || '').replace(/\D/g, ''), 10);
+            return Number.isFinite(n) ? String(n + 1).padStart(largo, '0') : '';
+        };
+
+        res.json({
+            numero_factura: ultima.length ? subir(ultima[0].numero_factura, 6) : '',
+            numero_control: ultima.length ? subir(ultima[0].numero_control, 8) : '',
+            prefijo_control: (cfg.factura && cfg.factura.prefijo_control) || '00'
+        });
+    } catch (e) { next(e); }
+});
+
+/* --- Convertir una cotización o nota en factura --- */
+api.post('/presupuestos/:id/facturar', async (req, res, next) => {
+    try {
+        const orig = await Presupuesto.findById(req.params.id).lean();
+        if (!orig) return res.status(404).json({ error: 'No encontrado' });
+        if (orig.tipo === 'factura') return res.status(400).json({ error: 'Este documento ya es una factura.' });
+
+        const tasa = Math.max(0, num(req.body.tasa));
+        if (orig.moneda !== 'Bs' && !tasa) {
+            return res.status(400).json({ error: 'Indica la tasa para convertir los montos a bolívares.' });
+        }
+        const factor = orig.moneda === 'Bs' ? 1 : tasa;
+
+        const numeroOrigen = orig.numero;
+        delete orig._id; delete orig.__v;
+
+        orig.tipo = 'factura';
+        orig.origen = { id: String(req.params.id), numero: numeroOrigen || '' };
+        orig.numero = '';
+        orig.numero_factura = '';
+        orig.numero_control = '';
+        orig.estado = 'borrador';
+        orig.fecha = new Date();
+        orig.actualizado = new Date();
+        orig.moneda = 'Bs';
+        orig.tasa_usada = factor;
+        orig.validez_dias = 0;
+        orig.trabajo_realizado = '';
+        orig.metodos_pago = [];
+
+        // Los precios pasan a bolívares con la tasa indicada
+        orig.items = (orig.items || []).map(i => ({
+            producto: i.producto,
+            unidad: i.unidad || 'Und',
+            cantidad: i.cantidad,
+            precio: r2((i.precio || 0) * factor),
+            total: r2((i.cantidad || 0) * (i.precio || 0) * factor)
+        }));
+
+        const bruto = r2(orig.items.reduce((a, i) => a + i.cantidad * i.precio, 0));
+        orig.bruto = bruto;
+        orig.subtotal = bruto;
+        orig.exento = 0;
+        orig.ajustes = 0;
+        orig.descuento_tipo = 'porcentaje';
+        orig.descuento_valor = 0;
+        orig.descuento_monto = 0;
+        orig.base_imponible = bruto;
+        orig.iva = r2(bruto * (orig.con_iva ? (orig.iva_porcentaje || 0) : 0) / 100);
+        orig.total = r2(bruto + orig.iva);
+
+        const factura = await Presupuesto.create(orig);
+        res.status(201).json(factura);
     } catch (e) { next(e); }
 });
 
@@ -437,13 +576,16 @@ api.get('/presupuestos/:id/pdf', async (req, res, next) => {
         ]);
         if (!p) return res.status(404).send('El presupuesto no existe.');
 
-        const prefijoArchivo = p.tipo === 'nota_entrega' ? 'Nota-Entrega' : 'Cotizacion';
+        const prefijoArchivo = p.tipo === 'factura' ? 'Factura'
+            : p.tipo === 'nota_entrega' ? 'Nota-Entrega' : 'Cotizacion';
         const nombre = `${prefijoArchivo}-${(p.numero || 'SN').replace(/[^\w-]/g, '')}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition',
             `${req.query.descargar === '1' ? 'attachment' : 'inline'}; filename="${nombre}"`);
 
-        generarPDF(p, cfg.toObject ? cfg.toObject() : cfg, res);
+        const config = cfg.toObject ? cfg.toObject() : cfg;
+        if (p.tipo === 'factura') generarFactura(p, config, res);
+        else generarPDF(p, config, res);
     } catch (e) {
         console.error('Error generando PDF:', e);
         if (!res.headersSent) res.status(500).send('Error generando el PDF');
