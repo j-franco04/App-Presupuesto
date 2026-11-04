@@ -76,6 +76,17 @@ const PresupuestoSchema = new mongoose.Schema({
     ajustes:         { type: Number, default: 0 },
     base_imponible:  { type: Number, default: 0 },
     tasa_usada:      { type: Number, default: 0 },   // tasa con la que se convirtió a Bs
+
+    /* Retenciones que el CLIENTE le practica a esta factura.
+       Como contribuyente ordinario no retiene: solo le retienen. */
+    ret_iva_monto:       { type: Number, default: 0 },
+    ret_iva_comprobante: { type: String, default: '' },
+    ret_iva_fecha:       { type: Date },
+    ret_islr_monto:       { type: Number, default: 0 },
+    ret_islr_porcentaje:  { type: Number, default: 0 },
+    ret_islr_comprobante: { type: String, default: '' },
+    ret_islr_fecha:       { type: Date },
+    fecha_cobro:          { type: Date },
     // Moneda en la que se escribieron los precios ('Bs', '$' o '€').
     // El documento SIEMPRE se guarda en bolívares; esto solo sirve para
     // volver a mostrar los montos en divisa al editar.
@@ -193,6 +204,41 @@ const ConfigSchema = new mongoose.Schema({
 }, { minimize: false, collection: 'ab_config' });
 
 /* ---------------------------------------------------------------
+   4b. COMPRAS (libro de compras del IVA)
+   Artículo 75 del Reglamento de la Ley del IVA.
+   --------------------------------------------------------------- */
+const CompraSchema = new mongoose.Schema({
+    fecha:          { type: Date, required: true, index: true },
+    tipo_documento: { type: String, enum: ['factura', 'nota_credito', 'nota_debito', 'importacion'], default: 'factura' },
+    numero_factura: { type: String, default: '' },
+    numero_control: { type: String, default: '' },
+    // Para notas de crédito o débito: documento que afectan
+    documento_afectado: { type: String, default: '' },
+
+    proveedor: {
+        nombre: { type: String, default: '' },
+        rif:    { type: String, default: '' }
+    },
+
+    // Montos, siempre en bolívares
+    total:          { type: Number, default: 0 },   // incluye IVA
+    exento:         { type: Number, default: 0 },   // exentas, exoneradas o no sujetas
+    base_imponible: { type: Number, default: 0 },
+    alicuota:       { type: Number, default: 16 },
+    credito_fiscal: { type: Number, default: 0 },   // IVA soportado
+
+    // Retención de IVA practicada por el comprador (no aplica a ordinarios,
+    // se conserva la columna porque el formato del libro la exige)
+    iva_retenido:          { type: Number, default: 0 },
+    comprobante_retencion: { type: String, default: '' },
+
+    observacion: { type: String, default: '' },
+    creado:      { type: Date, default: Date.now }
+}, { collection: 'ab_compras' });
+
+CompraSchema.index({ fecha: 1, numero_factura: 1 });
+
+/* ---------------------------------------------------------------
    5. CATÁLOGO DE PRODUCTOS (lista de precios a2 y lo que agregues)
    --------------------------------------------------------------- */
 const ProductoSchema = new mongoose.Schema({
@@ -222,6 +268,7 @@ const ContadorSchema = new mongoose.Schema({
 
 const Presupuesto = mongoose.model('Presupuesto', PresupuestoSchema);
 const Producto    = mongoose.model('Producto', ProductoSchema);
+const Compra      = mongoose.model('Compra', CompraSchema);
 const Config      = mongoose.model('Config', ConfigSchema);
 const Contador    = mongoose.model('Contador', ContadorSchema);
 
@@ -267,6 +314,6 @@ async function siguienteNumero(prefijo = 'AB', tipo = 'cotizacion') {
 }
 
 module.exports = {
-    mongoose, Presupuesto, Config, Contador, Producto,
+    mongoose, Presupuesto, Config, Contador, Producto, Compra,
     conectar, obtenerConfig, siguienteNumero
 };

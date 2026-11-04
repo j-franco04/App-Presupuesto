@@ -8,7 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const {
-    Presupuesto, Config, Producto, conectar, obtenerConfig, siguienteNumero
+    Presupuesto, Config, Producto, Compra, conectar, obtenerConfig, siguienteNumero
 } = require('./models');
 const { generarPDF } = require('./pdf');
 const { generarFactura } = require('./pdf-factura');
@@ -132,6 +132,14 @@ function normalizar(body, cfg) {
         base_imponible: esFactura ? baseFactura : subtotal,
         tasa_usada: esFactura ? Math.max(0, num(body.tasa_usada)) : 0,
         moneda_captura: esFactura && ['$', '€', 'Bs'].includes(body.moneda_captura) ? body.moneda_captura : 'Bs',
+        ret_iva_monto:        esFactura ? Math.max(0, num(body.ret_iva_monto)) : 0,
+        ret_iva_comprobante:  esFactura ? txt(body.ret_iva_comprobante, 40) : '',
+        ret_iva_fecha:        esFactura && body.ret_iva_fecha ? parseFecha(body.ret_iva_fecha) : undefined,
+        ret_islr_monto:       esFactura ? Math.max(0, num(body.ret_islr_monto)) : 0,
+        ret_islr_porcentaje:  esFactura ? Math.max(0, num(body.ret_islr_porcentaje)) : 0,
+        ret_islr_comprobante: esFactura ? txt(body.ret_islr_comprobante, 40) : '',
+        ret_islr_fecha:       esFactura && body.ret_islr_fecha ? parseFecha(body.ret_islr_fecha) : undefined,
+        fecha_cobro:          esFactura && body.fecha_cobro ? parseFecha(body.fecha_cobro) : undefined,
         trabajo_realizado: tipo === 'nota_entrega' ? txt(body.trabajo_realizado, 5000) : '',
         estado: estados.includes(body.estado) ? body.estado : 'borrador',
         cliente: {
@@ -436,6 +444,49 @@ function detectarCampo(fila, candidatos, numerico) {
     return '';
 }
 
+/**
+ * Consulta la lista del proveedor probando las tres formas habituales de
+ * presentar la clave. Devuelve el mensaje real del servidor si todas fallan,
+ * que es lo único que permite saber qué está mal.
+ */
+async function consultarProveedor(url, apikey) {
+    const formas = [];
+
+    if (apikey) {
+        formas.push(['clave + Bearer', url, { apikey, Authorization: 'Bearer ' + apikey }]);
+        formas.push(['solo clave', url, { apikey }]);
+        const sep = url.includes('?') ? '&' : '?';
+        formas.push(['clave en la dirección', url + sep + 'apikey=' + encodeURIComponent(apikey), {}]);
+    } else {
+        formas.push(['sin clave', url, {}]);
+    }
+
+    const intentos = [];
+    for (const [etiqueta, direccion, extra] of formas) {
+        try {
+            const r = await fetch(direccion, {
+                headers: Object.assign({ Accept: 'application/json', 'Accept-Profile': 'public' }, extra)
+            });
+            if (r.ok) return { ok: true, datos: await r.json(), forma: etiqueta };
+
+            const cuerpo = (await r.text()).slice(0, 300);
+            let mensaje = cuerpo;
+            try { const j = JSON.parse(cuerpo); mensaje = j.message || j.msg || j.error || j.hint || cuerpo; } catch (e) { /* texto plano */ }
+            intentos.push(`${etiqueta}: ${r.status} ${mensaje}`);
+        } catch (err) {
+            intentos.push(`${etiqueta}: ${err.message}`);
+        }
+    }
+
+    const ultimo = intentos[intentos.length - 1] || '';
+    return {
+        ok: false,
+        estado: (ultimo.match(/: (\d{3}) /) || [])[1] || '',
+        mensaje: ultimo.replace(/^[^:]+: \d{3} /, ''),
+        intentos
+    };
+}
+
 api.post('/catalogo/sincronizar', async (req, res, next) => {
     try {
         const cfg = await obtenerConfig();
@@ -444,21 +495,16 @@ api.post('/catalogo/sincronizar', async (req, res, next) => {
         const apikey = txt(req.body.apikey !== undefined ? req.body.apikey : sc.apikey, 500);
         if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'Falta la dirección de la lista del proveedor.' });
 
-        const cabeceras = { Accept: 'application/json' };
-        if (apikey) { cabeceras.apikey = apikey; cabeceras.Authorization = 'Bearer ' + apikey; }
-
         let datos;
         try {
-            const r = await fetch(url, { headers: cabeceras });
-            if (!r.ok) {
-                const cuerpo = (await r.text()).slice(0, 200);
+            const intento = await consultarProveedor(url, apikey);
+            if (!intento.ok) {
                 return res.status(502).json({
-                    error: r.status === 401 || r.status === 403
-                        ? 'El proveedor rechazó la consulta: revisa la clave de acceso.'
-                        : `El proveedor respondió ${r.status}. ${cuerpo}`
+                    error: `El proveedor respondió ${intento.estado}: ${intento.mensaje}`,
+                    intentos: intento.intentos
                 });
             }
-            datos = await r.json();
+            datos = intento.datos;
         } catch (err) {
             return res.status(502).json({ error: 'No se pudo consultar al proveedor: ' + err.message });
         }
@@ -488,8 +534,19 @@ api.post('/catalogo/sincronizar', async (req, res, next) => {
 
         let nuevos = 0, actualizados = 0, saltados = 0;
 
+        // Muchas listas traen una columna con las características del equipo
+        const cSpecs = ['specs', 'especificaciones', 'detalle', 'descripcion_corta']
+            .find(k => Object.keys(muestra).some(x => x.toLowerCase() === k));
+        const claveSpecs = cSpecs ? Object.keys(muestra).find(x => x.toLowerCase() === cSpecs) : '';
+
         for (const fila of datos.slice(0, 2000)) {
-            const nombre = txt(fila[cNombre], 300);
+            let nombre = txt(fila[cNombre], 300);
+            if (claveSpecs && fila[claveSpecs] && cNombre !== claveSpecs) {
+                const specs = txt(fila[claveSpecs], 160);
+                if (specs && !nombre.toLowerCase().includes(specs.toLowerCase())) {
+                    nombre = (nombre + ' — ' + specs).slice(0, 300);
+                }
+            }
             const precio = Math.max(0, num(fila[cPrecio]));
             if (!nombre || !precio) { saltados++; continue; }
             const categoria = txt(fila[cCateg], 80) || 'General';
@@ -536,13 +593,10 @@ api.get('/tasa', async (req, res, next) => {
         const url = txt(req.query.url || sc.url_tasa, 500);
         if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'No hay una dirección configurada para la tasa.' });
 
-        const cabeceras = { Accept: 'application/json' };
-        if (sc.apikey) { cabeceras.apikey = sc.apikey; cabeceras.Authorization = 'Bearer ' + sc.apikey; }
+        const intento = await consultarProveedor(url, sc.apikey);
+        if (!intento.ok) return res.status(502).json({ error: `El proveedor respondió ${intento.estado}: ${intento.mensaje}` });
 
-        const r = await fetch(url, { headers: cabeceras });
-        if (!r.ok) return res.status(502).json({ error: `El proveedor respondió ${r.status}.` });
-
-        let datos = await r.json();
+        let datos = intento.datos;
         if (!Array.isArray(datos)) datos = datos.data || [datos];
         const fila = datos[0];
         if (!fila) return res.status(400).json({ error: 'La consulta no devolvió datos.' });
@@ -843,6 +897,313 @@ api.get('/clientes', async (req, res, next) => {
             { $limit: 400 }
         ]);
         res.json(lista.map(x => Object.assign({}, x.cliente, { cantidad: x.cantidad })));
+    } catch (e) { next(e); }
+});
+
+/* =========================================================
+   COMPRAS (alimentan el libro de compras)
+   ========================================================= */
+function normalizarCompra(b) {
+    const total = r2(num(b.total));
+    const exento = r2(Math.min(Math.max(0, num(b.exento)), total));
+    const alicuota = Math.max(0, Math.min(100, num(b.alicuota ?? 16)));
+
+    // Si no se indica la base, se despeja del total: base = (total - exento) / (1 + alícuota)
+    let base = num(b.base_imponible);
+    if (!base) base = alicuota > 0 ? (total - exento) / (1 + alicuota / 100) : (total - exento);
+    base = r2(base);
+
+    const credito = r2(num(b.credito_fiscal) || base * alicuota / 100);
+
+    return {
+        fecha: parseFecha(b.fecha),
+        tipo_documento: ['factura', 'nota_credito', 'nota_debito', 'importacion'].includes(b.tipo_documento)
+            ? b.tipo_documento : 'factura',
+        numero_factura: txt(b.numero_factura, 40),
+        numero_control: txt(b.numero_control, 40),
+        documento_afectado: txt(b.documento_afectado, 40),
+        proveedor: {
+            nombre: txt(b.proveedor && b.proveedor.nombre, 200),
+            rif: txt(b.proveedor && b.proveedor.rif, 40)
+        },
+        total, exento, base_imponible: base, alicuota, credito_fiscal: credito,
+        iva_retenido: r2(Math.max(0, num(b.iva_retenido))),
+        comprobante_retencion: txt(b.comprobante_retencion, 40),
+        observacion: txt(b.observacion, 300)
+    };
+}
+
+api.get('/compras', async (req, res, next) => {
+    try {
+        const filtro = {};
+        if (req.query.desde || req.query.hasta) {
+            filtro.fecha = {};
+            if (req.query.desde) filtro.fecha.$gte = parseFecha(req.query.desde);
+            if (req.query.hasta) filtro.fecha.$lte = parseFecha(req.query.hasta);
+        }
+        if (req.query.q) {
+            const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            filtro.$or = [{ 'proveedor.nombre': rx }, { 'proveedor.rif': rx }, { numero_factura: rx }];
+        }
+        const lista = await Compra.find(filtro).sort({ fecha: 1, numero_factura: 1 }).limit(2000).lean();
+        res.json(lista);
+    } catch (e) { next(e); }
+});
+
+api.post('/compras', async (req, res, next) => {
+    try {
+        const datos = normalizarCompra(req.body);
+        if (!datos.proveedor.nombre) return res.status(400).json({ error: 'Escribe el nombre del proveedor.' });
+        if (!datos.numero_factura) return res.status(400).json({ error: 'Escribe el número de la factura del proveedor.' });
+        res.status(201).json(await Compra.create(datos));
+    } catch (e) { next(e); }
+});
+
+api.put('/compras/:id', async (req, res, next) => {
+    try {
+        const c = await Compra.findByIdAndUpdate(req.params.id, normalizarCompra(req.body), { new: true });
+        if (!c) return res.status(404).json({ error: 'No encontrada' });
+        res.json(c);
+    } catch (e) { next(e); }
+});
+
+api.delete('/compras/:id', async (req, res, next) => {
+    try {
+        const c = await Compra.findByIdAndDelete(req.params.id);
+        if (!c) return res.status(404).json({ error: 'No encontrada' });
+        res.json({ ok: true });
+    } catch (e) { next(e); }
+});
+
+/* =========================================================
+   LIBROS DE COMPRAS Y VENTAS (IVA)
+   Artículos 75 a 78 del Reglamento de la Ley del IVA.
+   El período es mensual y los totales deben coincidir con la
+   declaración (Forma 30).
+   ========================================================= */
+function rangoMes(anio, mes) {
+    const a = parseInt(anio, 10), m = parseInt(mes, 10);
+    const desde = new Date(Date.UTC(a, m - 1, 1, 0, 0, 0));
+    const hasta = new Date(Date.UTC(a, m, 1, 0, 0, 0));
+    return { desde, hasta };
+}
+
+async function libroVentas(anio, mes) {
+    {
+        const { desde, hasta } = rangoMes(anio, mes);
+
+        // El débito fiscal nace al emitir la factura: entran TODAS las emitidas,
+        // salvo las anuladas, que se muestran aparte para no romper el correlativo.
+        const facturas = await Presupuesto.find({
+            tipo: 'factura',
+            fecha: { $gte: desde, $lt: hasta }
+        }).sort({ numero_factura: 1, fecha: 1 }).lean();
+
+        const filas = facturas.map(f => {
+            const anulada = f.estado === 'anulado';
+            const signo = anulada ? 0 : 1;
+            return {
+                id: f._id,
+                fecha: f.fecha,
+                numero_factura: f.numero_factura || f.numero || '',
+                numero_control: f.numero_control || '',
+                cliente: (f.cliente && f.cliente.nombre) || '',
+                rif: (f.cliente && f.cliente.rif) || '',
+                total: r2((f.total || 0) * signo),
+                exento: r2((f.exento || 0) * signo),
+                base_imponible: r2((f.base_imponible || 0) * signo),
+                alicuota: f.iva_porcentaje || 0,
+                debito_fiscal: r2((f.iva || 0) * signo),
+                iva_retenido: r2(f.ret_iva_monto || 0),
+                comprobante_retencion: f.ret_iva_comprobante || '',
+                islr_retenido: r2(f.ret_islr_monto || 0),
+                islr_porcentaje: f.ret_islr_porcentaje || 0,
+                islr_comprobante: f.ret_islr_comprobante || '',
+                estado: f.estado || 'borrador',
+                anulada,
+                cobrada: f.estado === 'pagada' || !!f.fecha_cobro,
+                fecha_cobro: f.fecha_cobro || null
+            };
+        });
+
+        const sumar = clave => r2(filas.reduce((a, f) => a + (f[clave] || 0), 0));
+        return {
+            periodo: { anio: +anio, mes: +mes },
+            filas,
+            totales: {
+                documentos: filas.length,
+                anuladas: filas.filter(f => f.anulada).length,
+                total: sumar('total'),
+                exento: sumar('exento'),
+                base_imponible: sumar('base_imponible'),
+                debito_fiscal: sumar('debito_fiscal'),
+                iva_retenido: sumar('iva_retenido'),
+                islr_retenido: sumar('islr_retenido'),
+                cobrado: r2(filas.filter(f => f.cobrada).reduce((a, f) => a + f.total, 0)),
+                por_cobrar: r2(filas.filter(f => !f.cobrada && !f.anulada).reduce((a, f) => a + f.total, 0))
+            }
+        };
+    }
+}
+
+async function libroCompras(anio, mes) {
+    {
+        const { desde, hasta } = rangoMes(anio, mes);
+
+        const compras = await Compra.find({ fecha: { $gte: desde, $lt: hasta } })
+            .sort({ fecha: 1, numero_factura: 1 }).lean();
+
+        // Las notas de crédito restan del crédito fiscal del período
+        const filas = compras.map(c => {
+            const signo = c.tipo_documento === 'nota_credito' ? -1 : 1;
+            return {
+                id: c._id,
+                fecha: c.fecha,
+                tipo_documento: c.tipo_documento,
+                numero_factura: c.numero_factura,
+                numero_control: c.numero_control,
+                documento_afectado: c.documento_afectado,
+                proveedor: c.proveedor.nombre,
+                rif: c.proveedor.rif,
+                total: r2(c.total * signo),
+                exento: r2(c.exento * signo),
+                base_imponible: r2(c.base_imponible * signo),
+                alicuota: c.alicuota,
+                credito_fiscal: r2(c.credito_fiscal * signo),
+                iva_retenido: r2(c.iva_retenido * signo),
+                comprobante_retencion: c.comprobante_retencion,
+                observacion: c.observacion
+            };
+        });
+
+        const sumar = clave => r2(filas.reduce((a, f) => a + (f[clave] || 0), 0));
+        return {
+            periodo: { anio: +anio, mes: +mes },
+            filas,
+            totales: {
+                documentos: filas.length,
+                total: sumar('total'),
+                exento: sumar('exento'),
+                base_imponible: sumar('base_imponible'),
+                credito_fiscal: sumar('credito_fiscal'),
+                iva_retenido: sumar('iva_retenido')
+            }
+        };
+    }
+}
+
+function validarPeriodo(req, res) {
+    const { desde } = rangoMes(req.query.anio, req.query.mes);
+    if (isNaN(desde.getTime())) { res.status(400).json({ error: 'Indica mes y año.' }); return false; }
+    return true;
+}
+
+api.get('/libros/ventas', async (req, res, next) => {
+    try {
+        if (!validarPeriodo(req, res)) return;
+        res.json(await libroVentas(req.query.anio, req.query.mes));
+    } catch (e) { next(e); }
+});
+
+api.get('/libros/compras', async (req, res, next) => {
+    try {
+        if (!validarPeriodo(req, res)) return;
+        res.json(await libroCompras(req.query.anio, req.query.mes));
+    } catch (e) { next(e); }
+});
+
+/**
+ * Relación de retenciones que le practicaron en el período, más el
+ * acumulado de ISLR del año, que es el anticipo de la declaración anual.
+ */
+api.get('/libros/retenciones', async (req, res, next) => {
+    try {
+        if (!validarPeriodo(req, res)) return;
+        const anio = parseInt(req.query.anio, 10), mes = parseInt(req.query.mes, 10);
+        const { desde, hasta } = rangoMes(anio, mes);
+        const inicioAnio = new Date(Date.UTC(anio, 0, 1));
+        const finAnio = new Date(Date.UTC(anio + 1, 0, 1));
+
+        const conRetencion = {
+            tipo: 'factura',
+            estado: { $ne: 'anulado' },
+            $or: [{ ret_iva_monto: { $gt: 0 } }, { ret_islr_monto: { $gt: 0 } }]
+        };
+
+        const [delMes, delAnio] = await Promise.all([
+            Presupuesto.find(Object.assign({ fecha: { $gte: desde, $lt: hasta } }, conRetencion))
+                .sort({ fecha: 1 }).lean(),
+            Presupuesto.find(Object.assign({ fecha: { $gte: inicioAnio, $lt: finAnio } }, conRetencion))
+                .select('ret_islr_monto ret_iva_monto fecha').lean()
+        ]);
+
+        const filas = delMes.map(f => ({
+            id: f._id,
+            fecha: f.fecha,
+            numero_factura: f.numero_factura || f.numero || '',
+            cliente: (f.cliente && f.cliente.nombre) || '',
+            rif: (f.cliente && f.cliente.rif) || '',
+            base_imponible: r2(f.base_imponible || 0),
+            iva: r2(f.iva || 0),
+            iva_retenido: r2(f.ret_iva_monto || 0),
+            iva_comprobante: f.ret_iva_comprobante || '',
+            iva_fecha: f.ret_iva_fecha || null,
+            islr_porcentaje: f.ret_islr_porcentaje || 0,
+            islr_retenido: r2(f.ret_islr_monto || 0),
+            islr_comprobante: f.ret_islr_comprobante || '',
+            islr_fecha: f.ret_islr_fecha || null
+        }));
+
+        const sumar = (lista, clave) => r2(lista.reduce((a, f) => a + (f[clave] || 0), 0));
+
+        // Acumulado mes a mes del ISLR, para ver cómo va el anticipo del año
+        const porMes = Array.from({ length: 12 }, () => 0);
+        delAnio.forEach(f => { porMes[new Date(f.fecha).getUTCMonth()] += (f.ret_islr_monto || 0); });
+
+        res.json({
+            periodo: { anio, mes },
+            filas,
+            totales: {
+                documentos: filas.length,
+                iva_retenido: sumar(filas, 'iva_retenido'),
+                islr_retenido: sumar(filas, 'islr_retenido')
+            },
+            anual: {
+                islr_retenido: r2(porMes.reduce((a, b) => a + b, 0)),
+                iva_retenido: r2(delAnio.reduce((a, f) => a + (f.ret_iva_monto || 0), 0)),
+                islr_por_mes: porMes.map(r2)
+            }
+        });
+    } catch (e) { next(e); }
+});
+
+/** Resumen del período: lo que va en la declaración. */
+api.get('/libros/resumen', async (req, res, next) => {
+    try {
+        if (!validarPeriodo(req, res)) return;
+        const anio = req.query.anio, mes = req.query.mes;
+        const [v, c] = await Promise.all([libroVentas(anio, mes), libroCompras(anio, mes)]);
+
+        const debito = v.totales.debito_fiscal;
+        const credito = c.totales.credito_fiscal;
+        const cuota = r2(debito - credito);
+        const retenido = v.totales.iva_retenido;
+
+        res.json({
+            periodo: { anio: +anio, mes: +mes },
+            ventas: v.totales,
+            compras: c.totales,
+            declaracion: {
+                debito_fiscal: debito,
+                credito_fiscal: credito,
+                cuota_tributaria: cuota,
+                iva_retenido_descontable: retenido,
+                // Si lo retenido supera la cuota, queda un excedente que se arrastra
+                a_pagar: r2(Math.max(0, cuota - retenido)),
+                excedente_retenciones: r2(Math.max(0, retenido - cuota)),
+                islr_retenido_anticipo: v.totales.islr_retenido
+            }
+        });
     } catch (e) { next(e); }
 });
 

@@ -369,6 +369,32 @@ kbd{
   background:var(--azul-luz); color:var(--azul); padding:1px 7px; border-radius:20px; margin-left:6px;
 }
 
+/* Libros fiscales */
+.libro-caja{background:var(--panel); border:1px solid var(--linea); border-radius:var(--r); box-shadow:var(--sombra); overflow:hidden}
+.libro-tabla{width:100%; border-collapse:collapse; font-size:11.5px; min-width:1100px}
+.libro-tabla th{
+  background:var(--negro); color:var(--amarillo); padding:8px 7px; text-align:left;
+  font-size:9.5px; letter-spacing:.3px; text-transform:uppercase; font-weight:700; white-space:nowrap;
+}
+.libro-tabla td{padding:7px; border-bottom:1px solid var(--linea-2); white-space:nowrap}
+.libro-tabla tbody tr:hover{background:var(--panel-2)}
+.libro-tabla tr.anulada td{color:var(--gris-2); text-decoration:line-through}
+.libro-tabla tr.credito td{color:var(--rojo)}
+.libro-tabla tfoot td{background:var(--panel-2); font-weight:700; border-top:2px solid var(--negro); padding:9px 7px}
+.libro-tabla .d{text-align:right; font-variant-numeric:tabular-nums}
+.scroll-x{overflow-x:auto}
+.tarjetas-resumen{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:16px}
+.t-res{background:var(--panel); border:1px solid var(--linea); border-radius:var(--r); padding:15px}
+.t-res span{display:block; font-size:10.5px; color:var(--gris); font-weight:700; letter-spacing:.4px; text-transform:uppercase}
+.t-res b{display:block; font-size:21px; font-variant-numeric:tabular-nums; margin-top:5px; letter-spacing:-.4px}
+.t-res small{display:block; font-size:11px; color:var(--gris-2); margin-top:3px}
+.t-res.oscura{background:var(--negro); border-color:var(--negro)}
+.t-res.oscura span{color:#8B8E95} .t-res.oscura b{color:var(--amarillo)} .t-res.oscura small{color:#8B8E95}
+.aviso-fiscal{
+  background:#EEF3FC; border:1px solid #CBDAF5; border-left:3px solid var(--azul);
+  padding:12px 14px; border-radius:var(--r-s); font-size:12.5px; line-height:1.55; margin-bottom:16px;
+}
+
 .vacio{text-align:center; color:var(--gris-2); padding:30px 20px; font-size:13px}
 .pista{font-size:12.5px; color:var(--gris); line-height:1.55}
 .aviso-iva{
@@ -421,6 +447,7 @@ kbd{
   </div>
 
   <div class="estado-con"><i class="punto" id="punto"></i><span id="txtCon">Conectando…</span></div>
+  <button class="btn btn-linea" id="btnVista" onclick="alternarVista()">Libros</button>
   <button class="btn btn-linea" onclick="nuevoPresupuesto()">Nuevo</button>
   <button class="btn btn-linea" onclick="abrirConfig()">Ajustes</button>
 </header>
@@ -544,6 +571,52 @@ kbd{
             <input id="f_ajustes" type="number" step="0.01" value="0">
           </div>
         </div>
+      </div>
+
+      <button type="button" class="plegador" data-abre="masRetenciones">
+        <span class="chevron">▶</span> Retenciones que me practicó el cliente
+        <span class="conteo" id="conteoRet">—</span>
+      </button>
+      <div class="plegable" id="masRetenciones">
+        <p class="pista" style="margin-bottom:12px">
+          Cárgalas cuando recibas el comprobante. Lo retenido de IVA se descuenta de tu cuota del mes
+          y lo de ISLR queda como anticipo del impuesto anual.
+        </p>
+        <div class="rejilla c4">
+          <div><label class="campo">IVA retenido (Bs.)</label><input id="f_ret_iva" type="number" step="0.01" min="0" value="0"></div>
+          <div><label class="campo">N° comprobante IVA</label><input id="f_ret_iva_comp" placeholder="20261000001234"></div>
+          <div><label class="campo">Fecha del comprobante</label><input id="f_ret_iva_fecha" type="date"></div>
+          <div style="display:flex; align-items:flex-end">
+            <button class="btn btn-mini" onclick="calcularRetIva()" style="width:100%">Calcular 75%</button>
+          </div>
+        </div>
+        <div class="rejilla c4" style="margin-top:14px">
+          <div>
+            <label class="campo">Concepto del ISLR</label>
+            <select id="f_islr_concepto">
+              <option value="2">Servicios contratados — 2%</option>
+              <option value="5">Honorarios profesionales — 5%</option>
+              <option value="3">Fletes / transporte — 3%</option>
+              <option value="0">Otro (lo escribo yo)</option>
+            </select>
+          </div>
+          <div><label class="campo">% aplicado</label><input id="f_ret_islr_pct" type="number" step="0.01" min="0" value="0"></div>
+          <div><label class="campo">ISLR retenido (Bs.)</label><input id="f_ret_islr" type="number" step="0.01" min="0" value="0"></div>
+          <div style="display:flex; align-items:flex-end">
+            <button class="btn btn-mini" onclick="calcularRetIslr()" style="width:100%">Calcular</button>
+          </div>
+        </div>
+        <div class="rejilla c4" style="margin-top:14px">
+          <div><label class="campo">N° comprobante ISLR</label><input id="f_ret_islr_comp"></div>
+          <div><label class="campo">Fecha del comprobante</label><input id="f_ret_islr_fecha" type="date"></div>
+          <div><label class="campo">Fecha de cobro</label><input id="f_fecha_cobro" type="date"></div>
+          <div></div>
+        </div>
+        <p class="pista" style="margin-top:12px">
+          Como persona jurídica domiciliada, lo habitual es que te retengan <b>2%</b> por servicios
+          contratados (numeral 11 del Decreto 1.808) o <b>5%</b> si lo clasifican como honorarios
+          profesionales. El ISLR se calcula sobre la base imponible, sin incluir el IVA.
+        </p>
       </div>
     </article>
 
@@ -738,6 +811,93 @@ kbd{
   </div>
 </section>
 
+<!-- ========== LIBROS FISCALES ========== -->
+<section id="vistaLibros" style="display:none; max-width:1340px; margin:24px auto 70px; padding:0 20px">
+  <div class="hist-cab">
+    <h2>Libros de IVA</h2>
+    <div class="hist-tabs">
+      <button type="button" class="hist-tab activa" data-l="ventas" onclick="verLibro('ventas')">Ventas</button>
+      <button type="button" class="hist-tab" data-l="compras" onclick="verLibro('compras')">Compras</button>
+      <button type="button" class="hist-tab" data-l="retenciones" onclick="verLibro('retenciones')">Retenciones</button>
+      <button type="button" class="hist-tab" data-l="resumen" onclick="verLibro('resumen')">Resumen</button>
+    </div>
+    <div class="hist-herramientas">
+      <select id="lb_mes"></select>
+      <select id="lb_anio"></select>
+      <button class="btn btn-mini" onclick="cargarLibro()">Actualizar</button>
+      <button class="btn btn-mini" onclick="exportarLibro()">Descargar CSV</button>
+      <button class="btn btn-mini" onclick="window.print()">Imprimir</button>
+    </div>
+  </div>
+
+  <div class="aviso-fiscal" id="avisoLibro"></div>
+  <div id="resumenLibro" class="tarjetas-resumen"></div>
+
+  <div style="margin-bottom:12px" id="accionesCompras">
+    <button class="btn btn-oscuro" onclick="abrirCompra()">+ Registrar compra</button>
+  </div>
+
+  <div class="libro-caja scroll-x" id="cajaLibro">
+    <table class="libro-tabla" id="tablaLibro">
+      <thead id="lb_thead"></thead>
+      <tbody id="lb_tbody"></tbody>
+      <tfoot id="lb_tfoot"></tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- ========== MODAL COMPRA ========== -->
+<div class="modal" id="modalCompra">
+  <div class="modal-caja" style="max-width:780px">
+    <div class="modal-cab">
+      <h3 id="tituloCompra">Registrar compra</h3>
+      <button class="btn btn-linea" onclick="cerrarCompra()">Cerrar</button>
+    </div>
+    <div class="modal-cuerpo">
+      <input type="hidden" id="cp_id">
+      <div class="rejilla c4">
+        <div><label class="campo">Fecha</label><input id="cp_fecha" type="date"></div>
+        <div><label class="campo">Tipo de documento</label>
+          <select id="cp_tipo">
+            <option value="factura">Factura</option>
+            <option value="nota_credito">Nota de crédito</option>
+            <option value="nota_debito">Nota de débito</option>
+            <option value="importacion">Importación</option>
+          </select></div>
+        <div><label class="campo">N° de factura</label><input id="cp_numero" placeholder="A-5521"></div>
+        <div><label class="campo">N° de control</label><input id="cp_control" placeholder="00-00012345"></div>
+      </div>
+      <div class="rejilla c2" style="margin-top:14px">
+        <div><label class="campo">Proveedor</label><input id="cp_prov" placeholder="Razón social"></div>
+        <div><label class="campo">RIF del proveedor</label><input id="cp_rif" placeholder="J-12345678-9"></div>
+      </div>
+      <div id="cp_afectado_caja" style="display:none; margin-top:14px">
+        <label class="campo">Documento que afecta</label>
+        <input id="cp_afectado" placeholder="N° de la factura original">
+      </div>
+
+      <div class="rejilla c4" style="margin-top:14px">
+        <div><label class="campo">Total con IVA (Bs.)</label><input id="cp_total" type="number" step="0.01" min="0" value="0"></div>
+        <div><label class="campo">Exento / no gravado</label><input id="cp_exento" type="number" step="0.01" min="0" value="0"></div>
+        <div><label class="campo">Alícuota (%)</label><input id="cp_alicuota" type="number" step="0.01" min="0" value="16"></div>
+        <div><label class="campo">IVA retenido (si aplica)</label><input id="cp_retenido" type="number" step="0.01" min="0" value="0"></div>
+      </div>
+      <div class="aviso-iva" style="margin-top:14px" id="cp_calculo"></div>
+      <div class="rejilla c2" style="margin-top:14px">
+        <div><label class="campo">N° comprobante de retención</label><input id="cp_comprobante"></div>
+        <div><label class="campo">Observación</label><input id="cp_obs"></div>
+      </div>
+
+      <div class="pie-modal">
+        <button class="btn btn-rojo" id="cp_borrar" style="display:none" onclick="borrarCompra()">Eliminar</button>
+        <div style="flex:1"></div>
+        <button class="btn" onclick="cerrarCompra()">Cancelar</button>
+        <button class="btn btn-oscuro" onclick="guardarCompra()">Guardar compra</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ========== MODAL CATÁLOGO ========== -->
 <div class="modal" id="modalCatalogo">
   <div class="modal-caja" style="max-width:740px">
@@ -859,8 +1019,10 @@ kbd{
             <input id="sy_url" placeholder="https://…/rest/v1/productos?select=*" autocomplete="off"></div>
           <div><label class="campo">Clave de acceso del proveedor</label>
             <input id="sy_key" type="password" placeholder="Pega aquí la clave pública" autocomplete="off"></div>
-          <div class="ancho-2"><label class="campo">Dirección de la tasa del día (opcional)</label>
+          <div><label class="campo">Dirección de la tasa del día (opcional)</label>
             <input id="sy_tasa" placeholder="https://…/rest/v1/configuracion?select=*" autocomplete="off"></div>
+          <div><label class="campo">Columna del precio (vacío = detectar sola)</label>
+            <input id="sy_campo_precio" placeholder="precio" autocomplete="off"></div>
         </div>
         <div class="rejilla c4" style="margin-top:12px; align-items:end">
           <div><label class="campo">Proveedor</label><input id="sy_prov" placeholder="Tecnomas"></div>
@@ -985,6 +1147,8 @@ let CATALOGO = [];
 let CLIENTES = [];
 let ARRASTRANDO = null;
 let PROV_FILTRO = null;      // null = todos los proveedores
+let LIBRO = 'ventas';
+let DATOS_LIBRO = null;
 
 const ESTADOS = {
   cotizacion:   [['borrador','Borrador'],['enviado','Enviada al cliente'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']],
@@ -1290,6 +1454,14 @@ function recolectar(){
     exento: parseFloat($('f_exento').value) || 0,
     ajustes: parseFloat($('f_ajustes').value) || 0,
     tasa_usada: parseFloat($('f_tasa_usada').value) || 0,
+    ret_iva_monto: parseFloat($('f_ret_iva').value) || 0,
+    ret_iva_comprobante: $('f_ret_iva_comp').value.trim(),
+    ret_iva_fecha: $('f_ret_iva_fecha').value || '',
+    ret_islr_monto: parseFloat($('f_ret_islr').value) || 0,
+    ret_islr_porcentaje: parseFloat($('f_ret_islr_pct').value) || 0,
+    ret_islr_comprobante: $('f_ret_islr_comp').value.trim(),
+    ret_islr_fecha: $('f_ret_islr_fecha').value || '',
+    fecha_cobro: $('f_fecha_cobro').value || '',
     estado: $('d_estado').value,
     fecha: $('d_fecha').value || hoyISO(),
     cliente: {
@@ -1347,7 +1519,11 @@ function nuevoPresupuesto(){
   ULTIMO_AUTO = null;
   $('editId').value = '';
   ['cl_nombre','cl_rif','cl_direccion','cl_telefono','cl_email','cl_contacto','d_nota_extra','d_tasa','d_trabajo',
-   'origenNumero','f_numero','f_control','f_referencia','f_tasa_usada'].forEach(i => $(i).value = '');
+   'origenNumero','f_numero','f_control','f_referencia','f_tasa_usada',
+   'f_ret_iva_comp','f_ret_iva_fecha','f_ret_islr_comp','f_ret_islr_fecha','f_fecha_cobro']
+    .forEach(i => $(i).value = '');
+  $('f_ret_iva').value = 0; $('f_ret_islr').value = 0; $('f_ret_islr_pct').value = 0;
+  contarRetenciones();
   $('f_forma').value = '';
   $('f_moneda_captura').value = 'Bs';
   $('f_exento').value = 0;
@@ -1396,6 +1572,15 @@ async function editar(id){
     $('f_ajustes').value = p.ajustes || 0;
     $('f_tasa_usada').value = p.tasa_usada || '';
     $('f_moneda_captura').value = p.moneda_captura || 'Bs';
+    $('f_ret_iva').value = p.ret_iva_monto || 0;
+    $('f_ret_iva_comp').value = p.ret_iva_comprobante || '';
+    $('f_ret_iva_fecha').value = (p.ret_iva_fecha || '').slice(0,10);
+    $('f_ret_islr').value = p.ret_islr_monto || 0;
+    $('f_ret_islr_pct').value = p.ret_islr_porcentaje || 0;
+    $('f_ret_islr_comp').value = p.ret_islr_comprobante || '';
+    $('f_ret_islr_fecha').value = (p.ret_islr_fecha || '').slice(0,10);
+    $('f_fecha_cobro').value = (p.fecha_cobro || '').slice(0,10);
+    contarRetenciones();
     $('origenNumero').value = (p.origen && p.origen.numero) || '';
     const c = p.cliente || {};
     $('cl_nombre').value = c.nombre || ''; $('cl_rif').value = c.rif || '';
@@ -1895,6 +2080,7 @@ async function sincronizarProveedor(){
       url,
       apikey: $('sy_key').value.trim(),
       url_tasa: $('sy_tasa').value.trim(),
+      campo_precio: $('sy_campo_precio').value.trim(),
       proveedor: $('sy_prov').value.trim(),
       margen: parseFloat($('sy_margen').value) || 0,
       moneda: $('sy_moneda').value,
@@ -1903,6 +2089,7 @@ async function sincronizarProveedor(){
 
     await cargarCatalogo();
     pintarCatalogoCfg();
+    $('resultadoSync').style.color = '';
     $('resultadoSync').textContent =
       `Se leyeron ${r.total} productos: ${r.nuevos} nuevos, ${r.actualizados} actualizados` +
       (r.saltados ? `, ${r.saltados} sin precio` : '') +
@@ -1912,6 +2099,7 @@ async function sincronizarProveedor(){
     mostrarUltimaSync(new Date().toISOString());
   } catch(e){
     $('resultadoSync').textContent = e.message;
+    $('resultadoSync').style.color = 'var(--rojo)';
     aviso('No se pudo sincronizar: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Consultar';
@@ -2011,6 +2199,425 @@ function autocompletarCliente(){
   });
   ULTIMO_AUTO = c;
   if (cambiados) aviso('Datos de ' + c.nombre + ' cargados (' + c.cantidad + ' documentos previos).', 'ok');
+}
+
+/* =======================================================
+   5d. LIBROS DE IVA
+   ======================================================= */
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function alternarVista(){
+  const enLibros = $('vistaLibros').style.display !== 'none';
+  $('vistaLibros').style.display = enLibros ? 'none' : 'block';
+  document.querySelector('main').style.display = enLibros ? 'grid' : 'none';
+  $('historial').style.display = enLibros ? 'block' : 'none';
+  $('ruta').style.display = enLibros ? ($('origenNumero').value ? 'block' : 'none') : 'none';
+  document.querySelector('.tipos').style.visibility = enLibros ? 'visible' : 'hidden';
+  $('btnVista').textContent = enLibros ? 'Libros' : 'Documentos';
+  if (!enLibros && !DATOS_LIBRO) cargarLibro();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function verLibro(cual){
+  LIBRO = cual;
+  document.querySelectorAll('.hist-tab[data-l]').forEach(b => b.classList.toggle('activa', b.dataset.l === cual));
+  cargarLibro();
+}
+
+function prepararPeriodo(){
+  const hoy = new Date();
+  const mes = $('lb_mes'), anio = $('lb_anio');
+  MESES.forEach((m, i) => { const o = document.createElement('option'); o.value = i+1; o.textContent = m; mes.appendChild(o); });
+  for (let a = hoy.getFullYear() + 1; a >= hoy.getFullYear() - 4; a--){
+    const o = document.createElement('option'); o.value = a; o.textContent = a; anio.appendChild(o);
+  }
+  mes.value = hoy.getMonth() + 1;
+  anio.value = hoy.getFullYear();
+  mes.onchange = anio.onchange = cargarLibro;
+}
+
+const celda = (texto, clase) => {
+  const td = document.createElement('td');
+  if (clase) td.className = clase;
+  td.textContent = texto == null ? '' : String(texto);
+  return td;
+};
+const fechaCorta = f => f ? new Date(f).toLocaleDateString('es-VE') : '';
+
+async function cargarLibro(){
+  const anio = $('lb_anio').value, mes = $('lb_mes').value;
+  if (!anio || !mes) return;
+  $('accionesCompras').style.display = LIBRO === 'compras' ? 'block' : 'none';
+  $('cajaLibro').style.display = LIBRO === 'resumen' ? 'none' : 'block';
+
+  try {
+    if (LIBRO === 'resumen'){
+      DATOS_LIBRO = await api(`/libros/resumen?anio=${anio}&mes=${mes}`);
+      pintarResumenFiscal(DATOS_LIBRO);
+      return;
+    }
+    DATOS_LIBRO = await api(`/libros/${LIBRO}?anio=${anio}&mes=${mes}`);
+    if (LIBRO === 'ventas') pintarLibroVentas(DATOS_LIBRO);
+    else if (LIBRO === 'retenciones') pintarRetenciones(DATOS_LIBRO);
+    else pintarLibroCompras(DATOS_LIBRO);
+  } catch(e){
+    aviso('No se pudo cargar el libro: ' + e.message, 'error');
+  }
+}
+
+function encabezados(lista){
+  const tr = document.createElement('tr');
+  lista.forEach(([t, clase]) => {
+    const th = document.createElement('th');
+    th.textContent = t;
+    if (clase) th.className = clase;
+    tr.appendChild(th);
+  });
+  $('lb_thead').innerHTML = '';
+  $('lb_thead').appendChild(tr);
+}
+
+function pieTotales(celdas){
+  const tr = document.createElement('tr');
+  celdas.forEach(([t, clase, span]) => {
+    const td = celda(t, clase);
+    if (span) td.colSpan = span;
+    tr.appendChild(td);
+  });
+  $('lb_tfoot').innerHTML = '';
+  $('lb_tfoot').appendChild(tr);
+}
+
+function pintarLibroVentas(d){
+  $('avisoLibro').innerHTML =
+    'Se incluyen <b>todas las facturas emitidas</b> del mes, porque el débito fiscal nace al emitir, ' +
+    'no al cobrar. Las anuladas aparecen en cero para no romper el correlativo. ' +
+    'La columna <b>Cobrada</b> es control interno tuyo y no forma parte del libro.';
+
+  encabezados([['Fecha'],['N° Factura'],['N° Control'],['Cliente'],['RIF'],
+               ['Total ventas','d'],['Exentas','d'],['Base imponible','d'],['%','d'],
+               ['Débito fiscal','d'],['IVA retenido','d'],['Comprob. IVA'],
+               ['ISLR %','d'],['ISLR retenido','d'],['Comprob. ISLR'],['Cobrada']]);
+
+  const cuerpo = $('lb_tbody');
+  cuerpo.innerHTML = '';
+  if (!d.filas.length){
+    const tr = document.createElement('tr');
+    const td = celda('No hay facturas emitidas en este período.', 'vacio');
+    td.colSpan = 16; tr.appendChild(td); cuerpo.appendChild(tr);
+  }
+
+  d.filas.forEach(f => {
+    const tr = document.createElement('tr');
+    if (f.anulada) tr.className = 'anulada';
+    [fechaCorta(f.fecha), f.numero_factura, f.numero_control, f.cliente, f.rif].forEach(v => tr.appendChild(celda(v)));
+    [f.total, f.exento, f.base_imponible].forEach(v => tr.appendChild(celda(nf(v), 'd')));
+    tr.appendChild(celda(f.alicuota ? f.alicuota + '%' : '', 'd'));
+    tr.appendChild(celda(nf(f.debito_fiscal), 'd'));
+    tr.appendChild(celda(f.iva_retenido ? nf(f.iva_retenido) : '', 'd'));
+    tr.appendChild(celda(f.comprobante_retencion || ''));
+    tr.appendChild(celda(f.islr_porcentaje ? f.islr_porcentaje + '%' : '', 'd'));
+    tr.appendChild(celda(f.islr_retenido ? nf(f.islr_retenido) : '', 'd'));
+    tr.appendChild(celda(f.islr_comprobante || ''));
+    tr.appendChild(celda(f.anulada ? '—' : (f.cobrada ? 'Sí' : 'No')));
+    cuerpo.appendChild(tr);
+  });
+
+  const t = d.totales;
+  pieTotales([['TOTALES', '', 5], [nf(t.total), 'd'], [nf(t.exento), 'd'], [nf(t.base_imponible), 'd'],
+              ['', 'd'], [nf(t.debito_fiscal), 'd'], [nf(t.iva_retenido), 'd'], ['', '', 2],
+              [nf(t.islr_retenido), 'd'], ['', '', 2]]);
+
+  $('resumenLibro').innerHTML = '';
+  tarjeta('Documentos', t.documentos, t.anuladas ? t.anuladas + ' anuladas' : 'ninguna anulada');
+  tarjeta('Base imponible', 'Bs ' + nf(t.base_imponible));
+  tarjeta('Débito fiscal', 'Bs ' + nf(t.debito_fiscal), 'va a la Forma 30', true);
+  tarjeta('IVA retenido', 'Bs ' + nf(t.iva_retenido), 'descontable de la cuota');
+  tarjeta('ISLR retenido', 'Bs ' + nf(t.islr_retenido), 'anticipo del año');
+  tarjeta('Por cobrar', 'Bs ' + nf(t.por_cobrar), 'control interno');
+}
+
+function pintarLibroCompras(d){
+  $('avisoLibro').innerHTML =
+    'Registra aquí las facturas que te dan tus proveedores. Las <b>notas de crédito</b> se restan ' +
+    'automáticamente del crédito fiscal del mes.';
+
+  encabezados([['Fecha'],['Tipo'],['N° Factura'],['N° Control'],['Proveedor'],['RIF'],
+               ['Total compras','d'],['Exentas','d'],['Base imponible','d'],['%','d'],
+               ['Crédito fiscal','d'],['Comprobante'],['']]);
+
+  const cuerpo = $('lb_tbody');
+  cuerpo.innerHTML = '';
+  if (!d.filas.length){
+    const tr = document.createElement('tr');
+    const td = celda('No hay compras registradas en este período.', 'vacio');
+    td.colSpan = 13; tr.appendChild(td); cuerpo.appendChild(tr);
+  }
+
+  const nombreTipo = {factura:'Factura', nota_credito:'N. Crédito', nota_debito:'N. Débito', importacion:'Importación'};
+  d.filas.forEach(f => {
+    const tr = document.createElement('tr');
+    if (f.tipo_documento === 'nota_credito') tr.className = 'credito';
+    [fechaCorta(f.fecha), nombreTipo[f.tipo_documento] || f.tipo_documento,
+     f.numero_factura, f.numero_control, f.proveedor, f.rif].forEach(v => tr.appendChild(celda(v)));
+    [f.total, f.exento, f.base_imponible].forEach(v => tr.appendChild(celda(nf(v), 'd')));
+    tr.appendChild(celda(f.alicuota ? f.alicuota + '%' : '', 'd'));
+    tr.appendChild(celda(nf(f.credito_fiscal), 'd'));
+    tr.appendChild(celda(f.comprobante_retencion || ''));
+    const tdAcc = document.createElement('td');
+    const b = document.createElement('button');
+    b.className = 'btn btn-mini'; b.textContent = 'Editar';
+    b.onclick = () => abrirCompra(f.id);
+    tdAcc.appendChild(b); tr.appendChild(tdAcc);
+    cuerpo.appendChild(tr);
+  });
+
+  const t = d.totales;
+  pieTotales([['TOTALES', '', 6], [nf(t.total), 'd'], [nf(t.exento), 'd'], [nf(t.base_imponible), 'd'],
+              ['', 'd'], [nf(t.credito_fiscal), 'd'], ['', '', 2]]);
+
+  $('resumenLibro').innerHTML = '';
+  tarjeta('Documentos', t.documentos);
+  tarjeta('Base imponible', 'Bs ' + nf(t.base_imponible));
+  tarjeta('Crédito fiscal', 'Bs ' + nf(t.credito_fiscal), 'va a la Forma 30', true);
+}
+
+function pintarRetenciones(d){
+  $('avisoLibro').innerHTML =
+    'Relación de las retenciones que te practicaron tus clientes. El <b>IVA retenido</b> se descuenta ' +
+    'de tu cuota del mes; el <b>ISLR retenido</b> se acumula todo el año y es anticipo de tu ' +
+    'declaración de renta, así que guarda los comprobantes.';
+
+  encabezados([['Fecha'],['N° Factura'],['Cliente'],['RIF'],['Base imponible','d'],['IVA facturado','d'],
+               ['IVA retenido','d'],['Comprob. IVA'],['ISLR %','d'],['ISLR retenido','d'],['Comprob. ISLR']]);
+
+  const cuerpo = $('lb_tbody');
+  cuerpo.innerHTML = '';
+  if (!d.filas.length){
+    const tr = document.createElement('tr');
+    const td = celda('No hay retenciones cargadas en este período.', 'vacio');
+    td.colSpan = 11; tr.appendChild(td); cuerpo.appendChild(tr);
+  }
+
+  d.filas.forEach(f => {
+    const tr = document.createElement('tr');
+    [fechaCorta(f.fecha), f.numero_factura, f.cliente, f.rif].forEach(v => tr.appendChild(celda(v)));
+    [f.base_imponible, f.iva, f.iva_retenido].forEach(v => tr.appendChild(celda(nf(v), 'd')));
+    tr.appendChild(celda(f.iva_comprobante || ''));
+    tr.appendChild(celda(f.islr_porcentaje ? f.islr_porcentaje + '%' : '', 'd'));
+    tr.appendChild(celda(f.islr_retenido ? nf(f.islr_retenido) : '', 'd'));
+    tr.appendChild(celda(f.islr_comprobante || ''));
+    cuerpo.appendChild(tr);
+  });
+
+  const t = d.totales;
+  pieTotales([['TOTALES', '', 6], [nf(t.iva_retenido), 'd'], [''], [''],
+              [nf(t.islr_retenido), 'd'], ['']]);
+
+  $('resumenLibro').innerHTML = '';
+  tarjeta('IVA retenido del mes', 'Bs ' + nf(t.iva_retenido), t.documentos + ' comprobantes');
+  tarjeta('ISLR retenido del mes', 'Bs ' + nf(t.islr_retenido));
+  tarjeta('ISLR acumulado ' + d.periodo.anio, 'Bs ' + nf(d.anual.islr_retenido),
+          'anticipo de tu declaración anual', true);
+  tarjeta('IVA retenido ' + d.periodo.anio, 'Bs ' + nf(d.anual.iva_retenido), 'acumulado del año');
+}
+
+function exportarRetenciones(){
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const filas = [['Fecha','N Factura','Cliente','RIF','Base imponible','IVA facturado','IVA retenido',
+                  'Comprobante IVA','ISLR %','ISLR retenido','Comprobante ISLR']];
+  DATOS_LIBRO.filas.forEach(f => filas.push([fechaCorta(f.fecha), f.numero_factura, f.cliente, f.rif,
+    f.base_imponible, f.iva, f.iva_retenido, f.iva_comprobante, f.islr_porcentaje,
+    f.islr_retenido, f.islr_comprobante]));
+  const t = DATOS_LIBRO.totales;
+  filas.push(['TOTALES','','','','','', t.iva_retenido, '', '', t.islr_retenido, '']);
+  filas.push([]);
+  filas.push(['ISLR acumulado del ano ' + DATOS_LIBRO.periodo.anio, DATOS_LIBRO.anual.islr_retenido]);
+
+  const csv = '\ufeff' + filas.map(f => f.map(esc).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `Retenciones-${$('lb_anio').value}-${String($('lb_mes').value).padStart(2,'0')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  aviso('Archivo descargado.', 'ok');
+}
+
+function tarjeta(titulo, valor, pie, oscura){
+  const d = document.createElement('div');
+  d.className = 't-res' + (oscura ? ' oscura' : '');
+  const s1 = document.createElement('span'); s1.textContent = titulo;
+  const b = document.createElement('b'); b.textContent = valor;
+  d.appendChild(s1); d.appendChild(b);
+  if (pie){ const s2 = document.createElement('small'); s2.textContent = pie; d.appendChild(s2); }
+  $('resumenLibro').appendChild(d);
+  return d;
+}
+
+function pintarResumenFiscal(d){
+  const dec = d.declaracion;
+  $('avisoLibro').innerHTML =
+    'Estos son los montos que deben coincidir con tu declaración de IVA del período. ' +
+    '<b>Revísalos con tu contador antes de declarar.</b>';
+  $('resumenLibro').innerHTML = '';
+  tarjeta('Débito fiscal', 'Bs ' + nf(dec.debito_fiscal), 'IVA de tus ventas');
+  tarjeta('Crédito fiscal', 'Bs ' + nf(dec.credito_fiscal), 'IVA de tus compras');
+  tarjeta('Cuota tributaria', 'Bs ' + nf(dec.cuota_tributaria), 'débito menos crédito');
+  tarjeta('IVA retenido', 'Bs ' + nf(dec.iva_retenido_descontable), 'lo que te retuvieron');
+  tarjeta(dec.excedente_retenciones > 0 ? 'Excedente a trasladar' : 'IVA a pagar',
+          'Bs ' + nf(dec.excedente_retenciones > 0 ? dec.excedente_retenciones : dec.a_pagar),
+          dec.excedente_retenciones > 0 ? 'pasa al mes siguiente' : 'del período', true);
+  tarjeta('ISLR retenido', 'Bs ' + nf(dec.islr_retenido_anticipo), 'anticipo del impuesto anual');
+  $('lb_thead').innerHTML = ''; $('lb_tbody').innerHTML = ''; $('lb_tfoot').innerHTML = '';
+}
+
+function exportarLibro(){
+  if (!DATOS_LIBRO || LIBRO === 'resumen') return aviso('Abre un libro antes de descargar.', 'error');
+
+  if (LIBRO === 'retenciones') return exportarRetenciones();
+
+  const filas = [];
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+
+  if (LIBRO === 'ventas'){
+    filas.push(['Fecha','N Factura','N Control','Cliente','RIF','Total ventas','Exentas',
+                'Base imponible','Alicuota','Debito fiscal','IVA retenido','Comprobante IVA',
+                'ISLR %','ISLR retenido','Comprobante ISLR','Cobrada']);
+    DATOS_LIBRO.filas.forEach(f => filas.push([fechaCorta(f.fecha), f.numero_factura, f.numero_control,
+      f.cliente, f.rif, f.total, f.exento, f.base_imponible, f.alicuota, f.debito_fiscal,
+      f.iva_retenido, f.comprobante_retencion, f.islr_porcentaje, f.islr_retenido,
+      f.islr_comprobante, f.cobrada ? 'Si' : 'No']));
+    const t = DATOS_LIBRO.totales;
+    filas.push(['TOTALES','','','','', t.total, t.exento, t.base_imponible, '', t.debito_fiscal,
+                t.iva_retenido, '', '', t.islr_retenido, '', '']);
+  } else {
+    filas.push(['Fecha','Tipo','N Factura','N Control','Proveedor','RIF','Total compras','Exentas',
+                'Base imponible','Alicuota','Credito fiscal','Comprobante']);
+    DATOS_LIBRO.filas.forEach(f => filas.push([fechaCorta(f.fecha), f.tipo_documento, f.numero_factura,
+      f.numero_control, f.proveedor, f.rif, f.total, f.exento, f.base_imponible, f.alicuota,
+      f.credito_fiscal, f.comprobante_retencion]));
+    const t = DATOS_LIBRO.totales;
+    filas.push(['TOTALES','','','','','', t.total, t.exento, t.base_imponible, '', t.credito_fiscal, '']);
+  }
+
+  // Punto y coma: así Excel en español separa bien las columnas
+  const csv = '\ufeff' + filas.map(f => f.map(esc).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `Libro-${LIBRO}-${$('lb_anio').value}-${String($('lb_mes').value).padStart(2,'0')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  aviso('Archivo descargado.', 'ok');
+}
+
+/* ---------- Registro de compras ---------- */
+function calcularCompra(){
+  const total = parseFloat($('cp_total').value) || 0;
+  const exento = Math.min(parseFloat($('cp_exento').value) || 0, total);
+  const alic = parseFloat($('cp_alicuota').value) || 0;
+  const base = alic > 0 ? (total - exento) / (1 + alic/100) : (total - exento);
+  const iva = base * alic / 100;
+  $('cp_calculo').innerHTML = `Base imponible <b>Bs ${nf(base)}</b> · Crédito fiscal <b>Bs ${nf(iva)}</b>` +
+    (exento ? ` · Exento <b>Bs ${nf(exento)}</b>` : '');
+  $('cp_afectado_caja').style.display = ['nota_credito','nota_debito'].includes($('cp_tipo').value) ? 'block' : 'none';
+  return {base, iva};
+}
+
+async function abrirCompra(id){
+  ['cp_numero','cp_control','cp_prov','cp_rif','cp_afectado','cp_comprobante','cp_obs'].forEach(i => $(i).value = '');
+  $('cp_total').value = 0; $('cp_exento').value = 0; $('cp_alicuota').value = 16; $('cp_retenido').value = 0;
+  $('cp_tipo').value = 'factura';
+  $('cp_id').value = id || '';
+  $('cp_borrar').style.display = id ? 'inline-flex' : 'none';
+  $('tituloCompra').textContent = id ? 'Editar compra' : 'Registrar compra';
+
+  if (id && DATOS_LIBRO){
+    const f = DATOS_LIBRO.filas.find(x => String(x.id) === String(id));
+    if (f){
+      $('cp_fecha').value = new Date(f.fecha).toISOString().slice(0,10);
+      $('cp_tipo').value = f.tipo_documento;
+      $('cp_numero').value = f.numero_factura;
+      $('cp_control').value = f.numero_control;
+      $('cp_prov').value = f.proveedor;
+      $('cp_rif').value = f.rif;
+      $('cp_afectado').value = f.documento_afectado || '';
+      $('cp_total').value = Math.abs(f.total);
+      $('cp_exento').value = Math.abs(f.exento);
+      $('cp_alicuota').value = f.alicuota;
+      $('cp_comprobante').value = f.comprobante_retencion || '';
+      $('cp_obs').value = f.observacion || '';
+    }
+  } else {
+    const a = $('lb_anio').value, m = String($('lb_mes').value).padStart(2,'0');
+    $('cp_fecha').value = `${a}-${m}-01`;
+  }
+
+  calcularCompra();
+  $('modalCompra').classList.add('abierto');
+}
+function cerrarCompra(){ $('modalCompra').classList.remove('abierto'); }
+
+async function guardarCompra(){
+  const id = $('cp_id').value;
+  const datos = {
+    fecha: $('cp_fecha').value,
+    tipo_documento: $('cp_tipo').value,
+    numero_factura: $('cp_numero').value.trim(),
+    numero_control: $('cp_control').value.trim(),
+    documento_afectado: $('cp_afectado').value.trim(),
+    proveedor: {nombre: $('cp_prov').value.trim(), rif: $('cp_rif').value.trim()},
+    total: parseFloat($('cp_total').value) || 0,
+    exento: parseFloat($('cp_exento').value) || 0,
+    alicuota: parseFloat($('cp_alicuota').value) || 0,
+    iva_retenido: parseFloat($('cp_retenido').value) || 0,
+    comprobante_retencion: $('cp_comprobante').value.trim(),
+    observacion: $('cp_obs').value.trim()
+  };
+  try {
+    await api(id ? '/compras/' + id : '/compras', {method: id ? 'PUT' : 'POST', body: JSON.stringify(datos)});
+    aviso(id ? 'Compra actualizada.' : 'Compra registrada.', 'ok');
+    cerrarCompra();
+    cargarLibro();
+  } catch(e){ aviso('No se pudo guardar: ' + e.message, 'error'); }
+}
+
+async function borrarCompra(){
+  const id = $('cp_id').value;
+  if (!id || !confirm('¿Eliminar esta compra del libro?')) return;
+  try {
+    await api('/compras/' + id, {method:'DELETE'});
+    aviso('Compra eliminada.', 'ok');
+    cerrarCompra();
+    cargarLibro();
+  } catch(e){ aviso('Error: ' + e.message, 'error'); }
+}
+
+/** Sugiere el 75% del IVA de la factura, que es el porcentaje general. */
+function calcularRetIva(){
+  const iva = parseFloat(($('t_iva').textContent || '').replace(/[^\d,]/g,'').replace(',','.')) || 0;
+  if (!iva) return aviso('La factura no tiene IVA calculado.', 'error');
+  $('f_ret_iva').value = Math.round(iva * 0.75 * 100) / 100;
+  contarRetenciones();
+  aviso('Sugerido el 75% del IVA. Verifícalo contra el comprobante.', 'ok');
+}
+
+/** Calcula el ISLR sobre la base imponible, que es sin IVA. */
+function calcularRetIslr(){
+  const base = parseFloat(($('t_bruto').textContent || '').replace(/[^\d,]/g,'').replace(',','.')) || 0;
+  const pct = parseFloat($('f_ret_islr_pct').value) || 0;
+  if (!base) return aviso('La factura no tiene montos cargados.', 'error');
+  if (!pct) return aviso('Indica el porcentaje que te aplicaron.', 'error');
+  $('f_ret_islr').value = Math.round(base * pct / 100 * 100) / 100;
+  contarRetenciones();
+  aviso('Calculado sobre la base imponible. Verifícalo contra el comprobante.', 'ok');
+}
+
+function contarRetenciones(){
+  const iva = parseFloat($('f_ret_iva').value) || 0;
+  const islr = parseFloat($('f_ret_islr').value) || 0;
+  const el = $('conteoRet');
+  if (el) el.textContent = (iva || islr) ? 'cargadas' : '—';
 }
 
 /* =======================================================
@@ -2119,6 +2726,7 @@ function abrirConfig(pest){
   const sc = CFG.sincronizacion || {};
   $('sy_url').value = sc.url || '';
   $('sy_tasa').value = sc.url_tasa || '';
+  $('sy_campo_precio').value = sc.campo_precio || '';
   $('sy_key').value = sc.apikey || '';
   $('sy_prov').value = sc.proveedor || '';
   $('sy_margen').value = sc.margen || 0;
@@ -2244,6 +2852,15 @@ async function iniciar(){
   $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
   ['f_exento','f_ajustes','f_tasa_usada'].forEach(id => $(id).addEventListener('input', recalcular));
   $('f_moneda_captura').addEventListener('change', cambiarMonedaCaptura);
+  ['f_ret_iva','f_ret_islr'].forEach(id => $(id).addEventListener('input', contarRetenciones));
+  $('f_islr_concepto').addEventListener('change', e => {
+    if (e.target.value !== '0') $('f_ret_islr_pct').value = e.target.value;
+  });
+  ['cp_total','cp_exento','cp_alicuota','cp_tipo'].forEach(id => {
+    $(id).addEventListener('input', calcularCompra);
+    $(id).addEventListener('change', calcularCompra);
+  });
+  prepararPeriodo();
   $('cl_nombre').addEventListener('change', autocompletarCliente);
   $('cl_nombre').addEventListener('input', autocompletarCliente);
 
@@ -2262,7 +2879,7 @@ async function iniciar(){
 
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's'){ e.preventDefault(); guardar(); }
-    if (e.key === 'Escape'){ cerrarConfig(); cerrarCatalogo(); }
+    if (e.key === 'Escape'){ cerrarConfig(); cerrarCatalogo(); cerrarCompra(); }
   });
 
   nuevaFila();
