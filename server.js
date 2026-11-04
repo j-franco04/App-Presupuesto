@@ -187,6 +187,19 @@ api.put('/config', async (req, res, next) => {
         if (b.prefijo !== undefined) cfg.prefijo = txt(b.prefijo, 8).toUpperCase() || 'AB';
         if (b.prefijo_nota !== undefined) cfg.prefijo_nota = txt(b.prefijo_nota, 8).toUpperCase() || 'NE';
 
+        if (b.sincronizacion) {
+            cfg.sincronizacion = cfg.sincronizacion || {};
+            const sc = b.sincronizacion;
+            if (sc.url !== undefined) cfg.sincronizacion.url = txt(sc.url, 500);
+            if (sc.url_tasa !== undefined) cfg.sincronizacion.url_tasa = txt(sc.url_tasa, 500);
+            if (sc.apikey !== undefined) cfg.sincronizacion.apikey = txt(sc.apikey, 500);
+            if (sc.proveedor !== undefined) cfg.sincronizacion.proveedor = txt(sc.proveedor, 80);
+            if (sc.margen !== undefined) cfg.sincronizacion.margen = Math.max(0, num(sc.margen));
+            if (sc.moneda !== undefined) cfg.sincronizacion.moneda = ['$', '€'].includes(sc.moneda) ? sc.moneda : '$';
+            if (sc.incluye_iva !== undefined) cfg.sincronizacion.incluye_iva = !!sc.incluye_iva;
+            cfg.markModified('sincronizacion');
+        }
+
         if (b.factura) {
             cfg.factura = cfg.factura || {};
             if (b.factura.prefijo_control !== undefined) cfg.factura.prefijo_control = txt(b.factura.prefijo_control, 6);
@@ -254,12 +267,37 @@ function precioDeTexto(txtPrecio) {
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
 }
 
+/**
+ * Une las líneas que traen solo el precio con el nombre de la línea anterior.
+ * Los catálogos en cuadrícula se copian así: el nombre en un renglón y el
+ * precio en el siguiente.
+ */
+function unirPreciosSueltos(texto) {
+    const lineas = String(texto || '').split(/\r?\n/);
+    const salida = [];
+
+    lineas.forEach(l => {
+        const limpia = l.trim();
+        const soloPrecio = /^[€$]?\s*[\d][\d.,]*\s*(?:USD|usd|\$|€|Bs\.?)?$/.test(limpia) && /\d/.test(limpia);
+        const anterior = salida.length ? salida[salida.length - 1].trim() : '';
+        const anteriorTienePrecio = /[\d][\d.,]*\s*$/.test(anterior);
+
+        if (soloPrecio && anterior && !anteriorTienePrecio) {
+            salida[salida.length - 1] = anterior + '\t' + limpia;   // se pega al nombre
+        } else if (limpia !== '') {
+            salida.push(limpia);
+        }
+    });
+
+    return salida.join('\n');
+}
+
 /** Convierte el texto pegado de la lista de precios en productos. */
-function interpretarLista(texto, monedaDefecto, incluyeIva) {
+function interpretarLista(texto, monedaDefecto, incluyeIva, proveedor, margen) {
     const filas = [];
     let categoria = 'General';
 
-    String(texto || '').split(/\r?\n/).forEach(linea => {
+    unirPreciosSueltos(texto).split(/\r?\n/).forEach(linea => {
         const l = linea.replace(/\|/g, '\t').trim();
         if (!l || /^[-\s\t]+$/.test(l)) return;
 
@@ -281,6 +319,8 @@ function interpretarLista(texto, monedaDefecto, incluyeIva) {
         filas.push({
             nombre: nombre.slice(0, 300),
             categoria, precio, moneda,
+            proveedor: String(proveedor || '').trim().slice(0, 80),
+            margen: Math.max(0, Number(margen) || 0),
             incluye_iva: !!incluyeIva,
             unidad: 'Und', activo: true, orden: filas.length,
             actualizado: new Date()
@@ -293,9 +333,10 @@ function interpretarLista(texto, monedaDefecto, incluyeIva) {
 api.get('/catalogo', async (req, res, next) => {
     try {
         const filtro = {};
+        if (req.query.proveedor !== undefined) filtro.proveedor = req.query.proveedor;
         if (req.query.q) {
             const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-            filtro.$or = [{ nombre: rx }, { categoria: rx }];
+            filtro.$or = [{ nombre: rx }, { categoria: rx }, { proveedor: rx }];
         }
         res.json(await Producto.find(filtro).sort({ orden: 1, nombre: 1 }).limit(1000).lean());
     } catch (e) { next(e); }
@@ -311,6 +352,8 @@ api.put('/catalogo', async (req, res, next) => {
                 unidad: txt(x.unidad, 20) || 'Und',
                 precio: Math.max(0, num(x.precio)),
                 moneda: ['$', '€'].includes(x.moneda) ? x.moneda : '€',
+                proveedor: txt(x.proveedor, 80),
+                margen: Math.max(0, num(x.margen)),
                 incluye_iva: !!x.incluye_iva,
                 activo: x.activo !== false,
                 orden: i,
@@ -327,15 +370,204 @@ api.put('/catalogo', async (req, res, next) => {
 /** Importa pegando la lista de precios (texto copiado de la web). */
 api.post('/catalogo/importar', async (req, res, next) => {
     try {
-        const filas = interpretarLista(req.body.texto, req.body.moneda === '$' ? '$' : '€', req.body.incluye_iva);
+        const proveedor = txt(req.body.proveedor, 80);
+        const filas = interpretarLista(
+            req.body.texto,
+            req.body.moneda === '$' ? '$' : '€',
+            req.body.incluye_iva,
+            proveedor,
+            req.body.margen
+        );
         if (!filas.length) return res.status(400).json({ error: 'No se reconoció ningún producto en el texto pegado.' });
 
-        if (req.body.modo === 'reemplazar') await Producto.deleteMany({});
-        const desde = await Producto.countDocuments();
-        filas.forEach((f, i) => { f.orden = desde + i; });
-        await Producto.insertMany(filas);
+        const modo = ['reemplazar', 'actualizar'].includes(req.body.modo) ? req.body.modo : 'agregar';
 
-        res.json({ ok: true, importados: filas.length });
+        // "Reemplazar" solo borra lo del mismo proveedor: así no se pierde el resto
+        if (modo === 'reemplazar') await Producto.deleteMany({ proveedor });
+
+        let nuevos = 0, actualizados = 0;
+
+        if (modo === 'actualizar') {
+            for (const f of filas) {
+                const existente = await Producto.findOne({ nombre: f.nombre, proveedor });
+                if (existente) {
+                    existente.precio = f.precio;
+                    existente.moneda = f.moneda;
+                    existente.incluye_iva = f.incluye_iva;
+                    existente.categoria = f.categoria;
+                    existente.actualizado = new Date();
+                    await existente.save();
+                    actualizados++;
+                } else {
+                    f.orden = await Producto.countDocuments();
+                    await Producto.create(f);
+                    nuevos++;
+                }
+            }
+        } else {
+            const desde = await Producto.countDocuments();
+            filas.forEach((f, i) => { f.orden = desde + i; });
+            await Producto.insertMany(filas);
+            nuevos = filas.length;
+        }
+
+        res.json({ ok: true, importados: nuevos + actualizados, nuevos, actualizados });
+    } catch (e) { next(e); }
+});
+
+/* ---------- Sincronización con la lista en línea de un proveedor ---------- */
+
+const CLAVES_NOMBRE = ['nombre', 'name', 'titulo', 'title', 'producto', 'modelo', 'descripcion'];
+const CLAVES_PRECIO = ['precio', 'price', 'precio_venta', 'precio_usd', 'pvp', 'monto', 'valor', 'costo'];
+const CLAVES_CATEG  = ['categoria', 'category', 'tipo', 'seccion', 'marca'];
+
+/** Busca en el primer registro qué columna corresponde a cada dato. */
+function detectarCampo(fila, candidatos, numerico) {
+    const claves = Object.keys(fila || {});
+    for (const c of candidatos) {
+        const k = claves.find(x => x.toLowerCase() === c);
+        if (k && (numerico ? !isNaN(parseFloat(fila[k])) : String(fila[k] || '').trim() !== '')) return k;
+    }
+    // Segunda pasada: cualquier columna que contenga la palabra
+    for (const c of candidatos) {
+        const k = claves.find(x => x.toLowerCase().includes(c));
+        if (k && (numerico ? !isNaN(parseFloat(fila[k])) : String(fila[k] || '').trim() !== '')) return k;
+    }
+    return '';
+}
+
+api.post('/catalogo/sincronizar', async (req, res, next) => {
+    try {
+        const cfg = await obtenerConfig();
+        const sc = cfg.sincronizacion || {};
+        const url = txt(req.body.url || sc.url, 500);
+        const apikey = txt(req.body.apikey !== undefined ? req.body.apikey : sc.apikey, 500);
+        if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'Falta la dirección de la lista del proveedor.' });
+
+        const cabeceras = { Accept: 'application/json' };
+        if (apikey) { cabeceras.apikey = apikey; cabeceras.Authorization = 'Bearer ' + apikey; }
+
+        let datos;
+        try {
+            const r = await fetch(url, { headers: cabeceras });
+            if (!r.ok) {
+                const cuerpo = (await r.text()).slice(0, 200);
+                return res.status(502).json({
+                    error: r.status === 401 || r.status === 403
+                        ? 'El proveedor rechazó la consulta: revisa la clave de acceso.'
+                        : `El proveedor respondió ${r.status}. ${cuerpo}`
+                });
+            }
+            datos = await r.json();
+        } catch (err) {
+            return res.status(502).json({ error: 'No se pudo consultar al proveedor: ' + err.message });
+        }
+
+        // Admite tanto un arreglo como {data:[...]} o {productos:[...]}
+        if (!Array.isArray(datos)) datos = datos.data || datos.productos || datos.items || datos.results || [];
+        if (!Array.isArray(datos) || !datos.length) {
+            return res.status(400).json({ error: 'La lista del proveedor llegó vacía o en un formato que no reconozco.' });
+        }
+
+        const muestra = datos[0];
+        const cNombre = txt(req.body.campo_nombre || sc.campo_nombre, 60) || detectarCampo(muestra, CLAVES_NOMBRE, false);
+        const cPrecio = txt(req.body.campo_precio || sc.campo_precio, 60) || detectarCampo(muestra, CLAVES_PRECIO, true);
+        const cCateg  = txt(req.body.campo_categoria || sc.campo_categoria, 60) || detectarCampo(muestra, CLAVES_CATEG, false);
+
+        if (!cNombre || !cPrecio) {
+            return res.status(400).json({
+                error: 'No identifiqué las columnas de nombre y precio.',
+                columnas: Object.keys(muestra).slice(0, 40)
+            });
+        }
+
+        const proveedor = txt(req.body.proveedor || sc.proveedor, 80) || 'Proveedor';
+        const margen = Math.max(0, num(req.body.margen !== undefined ? req.body.margen : sc.margen));
+        const moneda = ['$', '€'].includes(req.body.moneda || sc.moneda) ? (req.body.moneda || sc.moneda) : '$';
+        const incluyeIva = req.body.incluye_iva !== undefined ? !!req.body.incluye_iva : !!sc.incluye_iva;
+
+        let nuevos = 0, actualizados = 0, saltados = 0;
+
+        for (const fila of datos.slice(0, 2000)) {
+            const nombre = txt(fila[cNombre], 300);
+            const precio = Math.max(0, num(fila[cPrecio]));
+            if (!nombre || !precio) { saltados++; continue; }
+            const categoria = txt(fila[cCateg], 80) || 'General';
+
+            const existente = await Producto.findOne({ nombre, proveedor });
+            if (existente) {
+                existente.precio = precio;
+                existente.categoria = categoria;
+                existente.moneda = moneda;
+                existente.incluye_iva = incluyeIva;
+                existente.actualizado = new Date();
+                await existente.save();
+                actualizados++;
+            } else {
+                await Producto.create({
+                    nombre, categoria, proveedor, margen, precio, moneda,
+                    incluye_iva: incluyeIva, unidad: 'Und', activo: true,
+                    orden: await Producto.countDocuments(), actualizado: new Date()
+                });
+                nuevos++;
+            }
+        }
+
+        // Se recuerda la configuración que funcionó
+        cfg.sincronizacion = {
+            url, apikey, proveedor, margen, moneda, incluye_iva: incluyeIva,
+            url_tasa: txt(req.body.url_tasa !== undefined ? req.body.url_tasa : sc.url_tasa, 500),
+            campo_nombre: cNombre, campo_precio: cPrecio, campo_categoria: cCateg,
+            ultima: new Date()
+        };
+        cfg.markModified('sincronizacion');
+        await cfg.save();
+
+        res.json({ ok: true, nuevos, actualizados, saltados, total: datos.length,
+                   campos: { nombre: cNombre, precio: cPrecio, categoria: cCateg } });
+    } catch (e) { next(e); }
+});
+
+/** Trae la tasa del día desde la lista en línea del proveedor. */
+api.get('/tasa', async (req, res, next) => {
+    try {
+        const cfg = await obtenerConfig();
+        const sc = cfg.sincronizacion || {};
+        const url = txt(req.query.url || sc.url_tasa, 500);
+        if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'No hay una dirección configurada para la tasa.' });
+
+        const cabeceras = { Accept: 'application/json' };
+        if (sc.apikey) { cabeceras.apikey = sc.apikey; cabeceras.Authorization = 'Bearer ' + sc.apikey; }
+
+        const r = await fetch(url, { headers: cabeceras });
+        if (!r.ok) return res.status(502).json({ error: `El proveedor respondió ${r.status}.` });
+
+        let datos = await r.json();
+        if (!Array.isArray(datos)) datos = datos.data || [datos];
+        const fila = datos[0];
+        if (!fila) return res.status(400).json({ error: 'La consulta no devolvió datos.' });
+
+        // Busca la columna numérica que parezca una tasa
+        const claves = Object.keys(fila);
+        const candidata = ['tasa_dolar', 'tasa', 'dolar', 'precio_dolar', 'valor_dolar', 'bcv', 'valor']
+            .map(c => claves.find(k => k.toLowerCase().includes(c)))
+            .find(k => k && !isNaN(parseFloat(fila[k])) && parseFloat(fila[k]) > 0);
+
+        if (!candidata) {
+            return res.status(400).json({ error: 'No encontré la tasa en la respuesta.', columnas: claves.slice(0, 30) });
+        }
+        res.json({ tasa: Math.round(parseFloat(fila[candidata]) * 10000) / 10000, campo: candidata });
+    } catch (e) { next(e); }
+});
+
+/** Proveedores cargados, para filtrar el catálogo. */
+api.get('/proveedores', async (req, res, next) => {
+    try {
+        const lista = await Producto.aggregate([
+            { $group: { _id: '$proveedor', cantidad: { $sum: 1 }, ultima: { $max: '$actualizado' } } },
+            { $sort: { cantidad: -1 } }
+        ]);
+        res.json(lista.map(x => ({ proveedor: x._id || '', cantidad: x.cantidad, ultima: x.ultima })));
     } catch (e) { next(e); }
 });
 

@@ -150,6 +150,21 @@ const ConfigSchema = new mongoose.Schema({
     prefijo:        { type: String, default: 'AB' },
     prefijo_nota:   { type: String, default: 'NE' },
 
+    // Sincronización del catálogo con la lista en línea de un proveedor
+    sincronizacion: {
+        url:            { type: String, default: '' },
+        url_tasa:       { type: String, default: '' },   // lista con la tasa del día
+        apikey:         { type: String, default: '' },
+        proveedor:      { type: String, default: '' },
+        margen:         { type: Number, default: 0 },
+        moneda:         { type: String, default: '$' },
+        incluye_iva:    { type: Boolean, default: false },
+        campo_nombre:   { type: String, default: '' },   // vacío = detectar solo
+        campo_precio:   { type: String, default: '' },
+        campo_categoria:{ type: String, default: '' },
+        ultima:         { type: Date }
+    },
+
     // Datos que vienen preimpresos en el talonario físico
     factura: {
         prefijo_control: { type: String, default: '00' },
@@ -183,6 +198,10 @@ const ConfigSchema = new mongoose.Schema({
 const ProductoSchema = new mongoose.Schema({
     nombre:      { type: String, default: '', index: true },
     categoria:   { type: String, default: 'General' },
+    // Proveedor del que viene el precio ('' = propio)
+    proveedor:   { type: String, default: '', index: true },
+    // Margen sobre el precio del proveedor al pasarlo a una cotización
+    margen:      { type: Number, default: 0 },
     unidad:      { type: String, default: 'Und' },
     precio:      { type: Number, default: 0 },
     moneda:      { type: String, default: '€' },
