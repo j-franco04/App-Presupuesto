@@ -3,403 +3,633 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Presupuestos — AB TECHNOLOGY BY</title>
+<title>AB TECHNOLOGY BY — Documentos</title>
 <style>
+/* ===========================================================
+   TOKENS
+   =========================================================== */
 :root{
-  --negro:#141414; --tinta:#2B2B2B; --gris:#6F6F6B; --linea:#E3E3DE;
-  --fondo:#EFEEEA; --panel:#FFFFFF; --amarillo:#FFC107; --amarillo-osc:#E0A800;
-  --ok:#1B7F4B; --rojo:#C0392B; --azul:#2563EB; --radio:5px;
+  --negro:#15161A; --tinta:#23252B; --gris:#6E7179; --gris-2:#9A9DA4;
+  --linea:#E4E3DF; --linea-2:#EFEEEA;
+  --fondo:#F2F1ED; --panel:#FFFFFF; --panel-2:#FAFAF8;
+  --amarillo:#FFC107; --amarillo-osc:#D99E00; --amarillo-luz:#FFF7DF;
+  --ok:#17804A; --ok-luz:#E4F4EB; --rojo:#C0392B; --rojo-luz:#FBEAE7;
+  --azul:#2457D6; --azul-luz:#E7EDFC;
+  --r:10px; --r-s:7px;
+  --sombra:0 1px 2px rgba(20,22,26,.04), 0 8px 24px -12px rgba(20,22,26,.14);
+  --sombra-alta:0 12px 40px -12px rgba(20,22,26,.26);
+  --t:.18s cubic-bezier(.4,0,.2,1);
 }
-*{box-sizing:border-box}
+*{box-sizing:border-box; margin:0; padding:0}
+html{scroll-behavior:smooth}
 body{
-  margin:0; background:var(--fondo); color:var(--tinta);
-  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
-  font-size:14px; line-height:1.45;
+  background:var(--fondo); color:var(--tinta); font-size:14px; line-height:1.5;
+  font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,Inter,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
 }
-button{font-family:inherit}
+button,input,select,textarea{font-family:inherit; font-size:inherit; color:inherit}
+.num,.linea-total,.monto{font-variant-numeric:tabular-nums}
 
-/* ---------- Barra superior ---------- */
-#barra{
-  background:var(--negro); color:#fff; padding:10px 20px;
-  display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:50;
-  border-bottom:3px solid var(--amarillo);
+/* ===========================================================
+   BARRA SUPERIOR
+   =========================================================== */
+.barra{
+  position:sticky; top:0; z-index:60; background:var(--negro);
+  border-bottom:1px solid #000; display:flex; align-items:center; gap:18px;
+  padding:0 20px; height:60px;
 }
-#barra img{height:38px}
-#barra .marca{font-weight:700; letter-spacing:-.3px; font-size:15px}
-#barra .marca small{display:block; font-weight:400; font-size:11px; color:#B9B9B4; letter-spacing:0}
-#barra .sep{flex:1}
-.estado-con{display:flex; align-items:center; gap:7px; font-size:12px; color:#C9C9C4}
-.punto{width:9px; height:9px; border-radius:50%; background:#888}
-.punto.on{background:#37D07A} .punto.off{background:#E05252}
+.barra::after{content:''; position:absolute; left:0; right:0; bottom:-3px; height:3px; background:var(--amarillo)}
+.marca{display:flex; align-items:center; gap:11px; flex:0 0 auto}
+.marca img{height:34px}
+.marca div{color:#fff; font-weight:700; font-size:14px; letter-spacing:-.2px; line-height:1.15}
+.marca small{display:block; font-weight:400; font-size:10.5px; color:#8B8E95; letter-spacing:.3px}
 
-/* ---------- Botones ---------- */
+/* Selector de tipo: control segmentado */
+.tipos{display:flex; gap:2px; background:#232529; padding:3px; border-radius:9px; margin:0 auto}
+.tipo-btn{
+  background:none; border:0; padding:7px 17px; border-radius:7px; cursor:pointer;
+  font-size:13px; font-weight:600; color:#9EA1A8; transition:var(--t); white-space:nowrap;
+}
+.tipo-btn:hover{color:#fff}
+.tipo-btn.activa{background:var(--amarillo); color:#1A1A1A; box-shadow:0 1px 3px rgba(0,0,0,.3)}
+
+.estado-con{display:flex; align-items:center; gap:7px; font-size:12px; color:#9EA1A8}
+.punto{width:8px; height:8px; border-radius:50%; background:#6E7179; transition:var(--t)}
+.punto.on{background:#2ECC71; box-shadow:0 0 0 3px rgba(46,204,113,.18)}
+.punto.off{background:#E74C3C; box-shadow:0 0 0 3px rgba(231,76,60,.18)}
+
+/* ===========================================================
+   BOTONES
+   =========================================================== */
 .btn{
-  border:1px solid transparent; background:#F3F3F0; color:var(--tinta);
-  padding:8px 14px; border-radius:var(--radio); cursor:pointer; font-size:13px; font-weight:600;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  border:1px solid transparent; background:#F0EFEB; color:var(--tinta);
+  padding:9px 15px; border-radius:var(--r-s); cursor:pointer;
+  font-size:13px; font-weight:600; transition:var(--t); white-space:nowrap;
 }
-.btn:hover{filter:brightness(.96)}
-.btn-linea{background:transparent; border-color:#4A4A4A; color:#fff}
-.btn-linea:hover{background:#242424}
-.btn-primario{background:var(--amarillo); color:#1A1A1A; border-color:var(--amarillo-osc)}
+.btn:hover{background:#E7E6E1}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45; cursor:not-allowed; transform:none}
+.btn-primario{background:var(--amarillo); color:#1A1A1A; box-shadow:0 2px 8px -2px rgba(217,158,0,.5)}
+.btn-primario:hover{background:#FFCB2B}
 .btn-oscuro{background:var(--negro); color:var(--amarillo)}
-.btn-mini{padding:4px 9px; font-size:12px; border:1px solid var(--linea); background:#fff}
-.btn-mini:hover{background:#F3F3F0}
-.btn-rojo{color:var(--rojo); border-color:#F0C7C2}
-.btn:disabled{opacity:.5; cursor:not-allowed}
+.btn-oscuro:hover{background:#2A2C31}
+.btn-linea{background:transparent; border-color:#3A3D44; color:#E9E9E6}
+.btn-linea:hover{background:#262830; border-color:#50535B}
+.btn-mini{padding:5px 10px; font-size:12px; background:#fff; border:1px solid var(--linea)}
+.btn-mini:hover{background:#F6F5F2; border-color:#D5D4CF}
+.btn-rojo{color:var(--rojo); border-color:#F0CCC6}
+.btn-rojo:hover{background:var(--rojo-luz)}
+.btn-fantasma{background:transparent; color:var(--gris)}
+.btn-fantasma:hover{background:#EAE9E4; color:var(--tinta)}
 
-/* ---------- Estructura ---------- */
-main{max-width:1240px; margin:22px auto; padding:0 20px; display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:22px; align-items:start}
-.hoja{background:var(--panel); border:1px solid var(--linea); border-radius:var(--radio); padding:22px}
-.bloque + .bloque{margin-top:26px; padding-top:22px; border-top:1px solid var(--linea)}
-.titulo{font-size:13px; font-weight:700; margin:0 0 14px; padding-left:10px; border-left:4px solid var(--amarillo)}
-.rejilla{display:grid; gap:12px}
+/* ===========================================================
+   ESTRUCTURA
+   =========================================================== */
+main{
+  max-width:1340px; margin:24px auto; padding:0 20px;
+  display:grid; grid-template-columns:minmax(0,1fr) 332px; gap:20px; align-items:start;
+}
+.editor{display:flex; flex-direction:column; gap:16px; min-width:0}
+
+/* Tarjetas */
+.tarjeta{
+  background:var(--panel); border:1px solid var(--linea); border-radius:var(--r);
+  box-shadow:var(--sombra); overflow:hidden;
+}
+.t-cab{
+  display:flex; align-items:center; gap:12px; padding:14px 20px;
+  border-bottom:1px solid var(--linea-2); background:linear-gradient(to bottom,#fff,var(--panel-2));
+}
+.t-cab h2{font-size:14px; font-weight:700; letter-spacing:-.2px; display:flex; align-items:center; gap:9px}
+.t-cab h2::before{content:''; width:3px; height:15px; border-radius:2px; background:var(--amarillo)}
+.t-cab .nota{font-size:12px; color:var(--gris-2); margin-left:auto; text-align:right}
+.t-cuerpo{padding:18px 20px}
+
+/* Rejillas */
+.rejilla{display:grid; gap:14px}
 .c2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .c3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .c4{grid-template-columns:repeat(4,minmax(0,1fr))}
-label.campo{display:block; font-size:11.5px; color:var(--gris); font-weight:600; margin-bottom:4px}
+.ancho-2{grid-column:span 2}
+
+/* Campos */
+label.campo{
+  display:block; font-size:11px; font-weight:700; color:var(--gris);
+  letter-spacing:.3px; margin-bottom:5px; text-transform:uppercase;
+}
 input,select,textarea{
-  width:100%; padding:8px 10px; border:1px solid #D6D6D1; border-radius:var(--radio);
-  font-size:13.5px; font-family:inherit; background:#fff; color:var(--tinta);
+  width:100%; padding:9px 11px; border:1px solid #DCDBD6; border-radius:var(--r-s);
+  background:#fff; transition:var(--t); font-size:13.5px;
 }
-input:focus,select:focus,textarea:focus{outline:2px solid var(--amarillo); outline-offset:-1px; border-color:var(--amarillo)}
-textarea{resize:vertical}
-.interruptor{display:flex; align-items:center; gap:8px; font-size:13px; padding-top:18px}
-.interruptor input{width:17px; height:17px; accent-color:var(--negro)}
+input::placeholder,textarea::placeholder{color:#B5B8BE}
+input:hover,select:hover,textarea:hover{border-color:#C5C4BE}
+input:focus,select:focus,textarea:focus{
+  outline:none; border-color:var(--amarillo-osc); box-shadow:0 0 0 3px rgba(255,193,7,.22);
+}
+input:disabled,select:disabled{background:#F4F3F0; color:var(--gris); cursor:not-allowed}
+textarea{resize:vertical; line-height:1.55}
+select{appearance:none; background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='%236E7179' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:30px}
 
-/* ---------- Tabla de ítems ---------- */
-table{width:100%; border-collapse:collapse}
+.interruptor{display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; user-select:none}
+.interruptor input{width:auto; margin:0}
+input[type=checkbox]{
+  appearance:none; width:19px; height:19px; min-width:19px; border:1.5px solid #C9C8C2;
+  border-radius:5px; cursor:pointer; position:relative; transition:var(--t); padding:0;
+}
+input[type=checkbox]:checked{background:var(--negro); border-color:var(--negro)}
+input[type=checkbox]:checked::after{
+  content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+  border:solid var(--amarillo); border-width:0 2px 2px 0; transform:rotate(43deg);
+}
+
+/* Secciones plegables */
+.plegador{
+  width:100%; display:flex; align-items:center; gap:9px; padding:11px 20px;
+  background:none; border:0; border-top:1px solid var(--linea-2); cursor:pointer;
+  font-size:12.5px; font-weight:600; color:var(--gris); transition:var(--t);
+}
+.plegador:hover{background:var(--panel-2); color:var(--tinta)}
+.plegador .chevron{transition:transform var(--t); font-size:10px; color:var(--gris-2)}
+.plegador.abierto .chevron{transform:rotate(90deg)}
+.plegador .conteo{
+  margin-left:auto; font-size:11px; font-weight:700; color:var(--gris-2);
+  background:#F0EFEB; padding:2px 8px; border-radius:20px;
+}
+.plegable{display:none; padding:4px 20px 18px}
+.plegable.abierto{display:block; animation:abrir .22s ease}
+@keyframes abrir{from{opacity:0; transform:translateY(-6px)}to{opacity:1; transform:none}}
+
+/* ===========================================================
+   TABLA DE ÍTEMS
+   =========================================================== */
+.envoltura-tabla{overflow-x:auto}
+#tablaItems{width:100%; border-collapse:collapse; min-width:620px}
 #tablaItems th{
-  background:var(--negro); color:var(--amarillo); font-size:11px; letter-spacing:.4px;
-  text-align:left; padding:9px 8px; font-weight:700;
+  background:var(--panel-2); color:var(--gris); font-size:10.5px; letter-spacing:.5px;
+  text-transform:uppercase; text-align:left; padding:9px 8px; font-weight:700;
+  border-bottom:1px solid var(--linea); position:sticky; top:0;
 }
-#tablaItems td{padding:5px 4px; border-bottom:1px solid #F0F0EC; vertical-align:top}
-#tablaItems input{padding:7px 8px; font-size:13px}
-.num{text-align:right; font-variant-numeric:tabular-nums}
-.linea-total{font-weight:700; font-variant-numeric:tabular-nums; padding-top:13px !important; font-size:13px}
+#tablaItems th:first-child{padding-left:16px}
+#tablaItems td{padding:5px 4px; border-bottom:1px solid var(--linea-2); vertical-align:middle}
+#tablaItems tr{transition:background var(--t)}
+#tablaItems tbody tr:hover{background:#FCFCFA}
+#tablaItems tbody tr.arrastrando{opacity:.4; background:var(--amarillo-luz)}
+#tablaItems tbody tr.destino{box-shadow:inset 0 2px 0 var(--amarillo)}
+#tablaItems input{padding:7px 9px; font-size:13px; border-color:transparent; background:transparent}
+#tablaItems input:hover{background:#fff; border-color:#DCDBD6}
+#tablaItems input:focus{background:#fff}
+.asa{
+  cursor:grab; color:#C5C4BE; text-align:center; font-size:14px; user-select:none;
+  padding:0 2px 0 10px !important; transition:var(--t); line-height:1;
+}
+.asa:hover{color:var(--gris)}
+.asa:active{cursor:grabbing}
+.linea-total{font-weight:700; text-align:right; padding-right:10px !important; font-size:13px; white-space:nowrap}
+.acciones-items{display:flex; gap:9px; align-items:center; flex-wrap:wrap; padding:14px 20px 0}
+.atajo{
+  font-size:11px; color:var(--gris-2); margin-left:auto;
+  display:flex; align-items:center; gap:5px;
+}
+kbd{
+  background:#fff; border:1px solid var(--linea); border-bottom-width:2px; border-radius:4px;
+  padding:1px 5px; font-size:10.5px; font-family:inherit; font-weight:600; color:var(--gris);
+}
 
-/* ---------- Métodos de pago ---------- */
-.metodo{display:flex; gap:10px; align-items:flex-start; border:1px solid var(--linea); border-radius:var(--radio); padding:10px}
-.metodo input[type=checkbox]{width:17px; height:17px; margin-top:2px; accent-color:var(--negro)}
+/* ===========================================================
+   PANEL DE TOTALES
+   =========================================================== */
+.panel{position:sticky; top:84px; display:flex; flex-direction:column; gap:12px}
+.caja-total{
+  background:var(--negro); color:#fff; border-radius:var(--r); padding:20px;
+  box-shadow:var(--sombra-alta); position:relative; overflow:hidden;
+}
+.caja-total::before{
+  content:''; position:absolute; top:-40px; right:-50px; width:150px; height:150px;
+  background:radial-gradient(circle,rgba(255,193,7,.16),transparent 65%);
+}
+.caja-total .fila{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:12.5px; color:#9EA1A8; margin-bottom:9px; position:relative;
+}
+.caja-total .fila b{color:#E9E9E6; font-weight:600; font-variant-numeric:tabular-nums}
+.caja-total hr{border:0; border-top:1px solid #2E3036; margin:14px 0}
+.gran-total{display:flex; justify-content:space-between; align-items:baseline; position:relative}
+.gran-total span:first-child{font-size:11px; font-weight:700; letter-spacing:1px; color:#8B8E95}
+.gran-total span:last-child{
+  font-size:25px; font-weight:700; color:var(--amarillo); font-variant-numeric:tabular-nums;
+  letter-spacing:-.6px; transition:transform .2s ease;
+}
+.gran-total span.pulso{transform:scale(1.045)}
+.bs{margin-top:9px; font-size:11.5px; color:#8B8E95; text-align:right; line-height:1.45}
+.acciones{display:flex; flex-direction:column; gap:8px}
+.acciones .btn{width:100%; padding:13px}
+.aviso-edicion{
+  background:var(--amarillo-luz); border:1px solid #F0DCA4; border-left:3px solid var(--amarillo);
+  padding:11px 13px; border-radius:var(--r-s); font-size:12.5px; line-height:1.5;
+}
+
+/* ===========================================================
+   HISTORIAL
+   =========================================================== */
+#historial{max-width:1340px; margin:34px auto 70px; padding:0 20px}
+.hist-cab{display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap}
+.hist-cab h2{font-size:16px; font-weight:700; letter-spacing:-.3px; display:flex; align-items:center; gap:9px}
+.hist-cab h2::before{content:''; width:3px; height:17px; border-radius:2px; background:var(--amarillo)}
+.hist-herramientas{display:flex; gap:9px; margin-left:auto; flex-wrap:wrap}
+.hist-herramientas input,.hist-herramientas select{width:auto; min-width:160px; background:#fff}
+.buscador-caja{position:relative}
+.buscador-caja input{padding-left:32px; min-width:220px}
+.buscador-caja::before{
+  content:'⌕'; position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  color:var(--gris-2); font-size:17px; pointer-events:none;
+}
+.tabla-caja{background:var(--panel); border:1px solid var(--linea); border-radius:var(--r); box-shadow:var(--sombra); overflow:hidden}
+#tablaHist{width:100%; border-collapse:collapse}
+#tablaHist th{
+  text-align:left; font-size:10.5px; color:var(--gris); padding:11px 14px; font-weight:700;
+  letter-spacing:.5px; text-transform:uppercase; border-bottom:1px solid var(--linea); background:var(--panel-2);
+}
+#tablaHist td{padding:11px 14px; border-bottom:1px solid var(--linea-2); font-size:13px}
+#tablaHist tbody tr{transition:background var(--t)}
+#tablaHist tbody tr:hover{background:var(--panel-2)}
+#tablaHist tr:last-child td{border-bottom:0}
+.sub-folio{display:block; font-size:10.5px; color:var(--gris-2); font-weight:500; margin-top:1px}
+.chip{
+  display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600;
+  padding:3px 10px; border-radius:20px; background:#F0EFEB; color:var(--gris); white-space:nowrap;
+}
+.chip::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor}
+.chip.enviado,.chip.entregada{color:var(--azul); background:var(--azul-luz)}
+.chip.aprobado,.chip.pagada{color:var(--ok); background:var(--ok-luz)}
+.chip.emitida{color:var(--amarillo-osc); background:var(--amarillo-luz)}
+.chip.rechazado{color:var(--rojo); background:var(--rojo-luz)}
+.chip.anulado{color:#86888D; background:#EDECE8; text-decoration:line-through}
+.acc{display:flex; gap:5px; flex-wrap:wrap; align-items:center}
+.paginacion{display:flex; gap:11px; align-items:center; justify-content:flex-end; margin-top:14px; font-size:12.5px; color:var(--gris)}
+.esqueleto{height:13px; border-radius:4px; background:linear-gradient(90deg,#EFEEEA 25%,#F7F6F3 50%,#EFEEEA 75%); background-size:200% 100%; animation:brillo 1.2s infinite}
+@keyframes brillo{to{background-position:-200% 0}}
+
+/* ===========================================================
+   MODALES
+   =========================================================== */
+.modal{
+  position:fixed; inset:0; background:rgba(21,22,26,.55); backdrop-filter:blur(3px);
+  display:none; z-index:100; padding:28px 20px; overflow:auto;
+}
+.modal.abierto{display:block; animation:fundido .16s ease}
+@keyframes fundido{from{opacity:0}to{opacity:1}}
+.modal-caja{
+  background:#fff; max-width:860px; margin:0 auto; border-radius:14px; overflow:hidden;
+  box-shadow:0 24px 70px -18px rgba(0,0,0,.5); animation:subir .22s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes subir{from{opacity:0; transform:translateY(14px) scale(.985)}to{opacity:1; transform:none}}
+.modal-cab{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; background:var(--negro); color:#fff}
+.modal-cab h3{margin:0; font-size:15px; font-weight:600}
+.modal-cuerpo{padding:22px}
+.pestanas{display:flex; gap:3px; border-bottom:1px solid var(--linea); margin-bottom:20px; overflow-x:auto}
+.pestanas button{
+  background:none; border:0; padding:10px 15px; cursor:pointer; font-size:13px; font-weight:600;
+  color:var(--gris); border-bottom:2.5px solid transparent; transition:var(--t); white-space:nowrap;
+}
+.pestanas button:hover{color:var(--tinta)}
+.pestanas button.activa{color:var(--negro); border-bottom-color:var(--amarillo)}
+.panel-pest{display:none}
+.panel-pest.activo{display:block; animation:abrir .2s ease}
+.pie-modal{margin-top:22px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--linea); padding-top:18px}
+
+/* Catálogo y métodos */
+.buscador{max-height:50vh; overflow:auto; border:1px solid var(--linea); border-radius:var(--r-s)}
+.prod{display:flex; gap:12px; align-items:center; padding:11px 15px; border-bottom:1px solid var(--linea-2); cursor:pointer; transition:var(--t)}
+.prod:last-child{border-bottom:0}
+.prod:hover{background:var(--amarillo-luz)}
+.prod b{font-size:13.5px; font-weight:600; display:block}
+.prod small{font-size:11px; color:var(--gris-2)}
+.prod .pr{margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap}
+.cat-tit{background:var(--panel-2); padding:7px 15px; font-size:10.5px; font-weight:700; color:var(--gris); letter-spacing:.5px; text-transform:uppercase; position:sticky; top:0}
+.fila-prod{display:grid; grid-template-columns:2.2fr 1fr .7fr .6fr auto; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--linea-2)}
+.fila-prod input,.fila-prod select{padding:6px 8px; font-size:12.5px}
+.fila-metodo{border:1px solid var(--linea); border-radius:var(--r-s); padding:14px; margin-bottom:11px; background:var(--panel-2)}
+.metodo{
+  display:flex; gap:11px; align-items:flex-start; border:1px solid var(--linea);
+  border-radius:var(--r-s); padding:12px; cursor:pointer; transition:var(--t); background:#fff;
+}
+.metodo:hover{border-color:#C9C8C2; background:var(--panel-2)}
+.metodo:has(input:checked){border-color:var(--amarillo-osc); background:var(--amarillo-luz)}
 .metodo b{display:block; font-size:13px}
 .metodo span{font-size:11.5px; color:var(--gris)}
 
-/* ---------- Resumen ---------- */
-.resumen{position:sticky; top:78px}
-.caja-total{background:var(--negro); color:#fff; border-radius:var(--radio); padding:18px}
-.caja-total .fila{display:flex; justify-content:space-between; font-size:13px; color:#C9C9C4; margin-bottom:7px}
-.caja-total .fila b{color:#fff; font-variant-numeric:tabular-nums; font-weight:600}
-.caja-total hr{border:0; border-top:1px solid #3A3A3A; margin:12px 0}
-.gran-total{display:flex; justify-content:space-between; align-items:baseline; color:var(--amarillo); font-weight:700}
-.gran-total span:first-child{font-size:13px}
-.gran-total span:last-child{font-size:24px; font-variant-numeric:tabular-nums}
-.bs{margin-top:8px; font-size:12px; color:#B9B9B4; text-align:right}
-.acciones{margin-top:14px; display:grid; gap:8px}
-.acciones .btn{width:100%; padding:12px}
-.aviso-edicion{background:#FFF6DA; border:1px solid #F3DDA0; padding:10px; border-radius:var(--radio); font-size:12.5px; margin-bottom:12px}
-
-/* ---------- Historial ---------- */
-#historial{max-width:1240px; margin:0 auto 60px; padding:0 20px}
-.barra-hist{display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap}
-.barra-hist input,.barra-hist select{width:auto; min-width:180px}
-#tablaHist{background:var(--panel); border:1px solid var(--linea); border-radius:var(--radio); overflow:hidden}
-#tablaHist th{text-align:left; font-size:11px; color:var(--gris); padding:10px 12px; border-bottom:1px solid var(--linea); letter-spacing:.3px}
-#tablaHist td{padding:10px 12px; border-bottom:1px solid #F2F2EE; font-size:13px}
-#tablaHist tr:last-child td{border-bottom:0}
-.chip{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:20px; background:#F0F0EC; color:var(--gris)}
-.chip::before{content:''; width:7px; height:7px; border-radius:50%; background:currentColor}
-.chip.enviado{color:#1D4ED8; background:#E5EDFF}
-.chip.aprobado{color:var(--ok); background:#E3F5EB}
-.chip.rechazado{color:var(--rojo); background:#FBEAE8}
-.chip.anulado{color:#7A7A7A; background:#EDEDED; text-decoration:line-through}
-.acc{display:flex; gap:5px; flex-wrap:wrap}
-.paginacion{display:flex; gap:10px; align-items:center; justify-content:flex-end; margin-top:12px; font-size:13px; color:var(--gris)}
-
-/* ---------- Modal ---------- */
-.modal{position:fixed; inset:0; background:rgba(20,20,20,.55); display:none; z-index:100; padding:24px; overflow:auto}
-.modal.abierto{display:block}
-.modal-caja{background:#fff; max-width:820px; margin:0 auto; border-radius:var(--radio); overflow:hidden}
-.modal-cab{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; background:var(--negro); color:#fff}
-.modal-cab h3{margin:0; font-size:15px}
-.modal-cuerpo{padding:20px}
-.pestanas{display:flex; gap:4px; border-bottom:1px solid var(--linea); margin-bottom:18px}
-.pestanas button{background:none; border:0; padding:10px 14px; cursor:pointer; font-size:13px; font-weight:600; color:var(--gris); border-bottom:3px solid transparent}
-.pestanas button.activa{color:var(--negro); border-bottom-color:var(--amarillo)}
-.panel-pest{display:none} .panel-pest.activo{display:block}
-.fila-metodo{border:1px solid var(--linea); border-radius:var(--radio); padding:12px; margin-bottom:10px}
-
-/* ---------- Avisos ---------- */
-#avisos{position:fixed; right:18px; bottom:18px; z-index:200; display:flex; flex-direction:column; gap:8px}
-.aviso{background:var(--negro); color:#fff; padding:11px 16px; border-radius:var(--radio); font-size:13px; border-left:4px solid var(--amarillo); max-width:340px}
-.aviso.ok{border-left-color:#37D07A} .aviso.error{border-left-color:#E05252}
-
-/* ---------- Selector de tipo de documento ---------- */
-.tipos{display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid var(--linea)}
-.tipo-btn{
-  background:none; border:0; padding:10px 18px; cursor:pointer; font-size:14px; font-weight:600;
-  color:var(--gris); border-bottom:3px solid transparent; margin-bottom:-1px;
+/* ===========================================================
+   AVISOS
+   =========================================================== */
+#avisos{position:fixed; right:20px; bottom:20px; z-index:200; display:flex; flex-direction:column; gap:9px}
+.aviso{
+  background:var(--negro); color:#fff; padding:12px 17px; border-radius:var(--r-s);
+  font-size:13px; border-left:3px solid var(--amarillo); max-width:360px;
+  box-shadow:var(--sombra-alta); animation:entra .26s cubic-bezier(.2,.9,.3,1);
 }
-.tipo-btn.activa{color:var(--negro); border-bottom-color:var(--amarillo)}
-.chip.entregada{color:#1D4ED8; background:#E5EDFF}
-.chip.pagada{color:var(--ok); background:#E3F5EB}
-.sub-folio{display:block; font-size:10.5px; color:var(--gris); font-weight:500; letter-spacing:.2px}
-.pista{font-size:12.5px; color:var(--gris); margin:-6px 0 12px}
+@keyframes entra{from{opacity:0; transform:translateX(24px)}to{opacity:1; transform:none}}
+.aviso.ok{border-left-color:#2ECC71}
+.aviso.error{border-left-color:#E74C3C}
 
-.buscador{max-height:52vh; overflow:auto; border:1px solid var(--linea); border-radius:var(--radio)}
-.prod{display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid #F2F2EE; cursor:pointer}
-.prod:last-child{border-bottom:0}
-.prod:hover{background:#FFF8E1}
-.prod b{font-size:13.5px; font-weight:600; display:block}
-.prod small{font-size:11.5px; color:var(--gris)}
-.prod .pr{margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap}
-.cat-tit{background:#F3F3F0; padding:6px 14px; font-size:11px; font-weight:700; color:var(--gris); letter-spacing:.5px}
-.fila-prod{display:grid; grid-template-columns:2.2fr 1fr .7fr .6fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #F2F2EE}
-.fila-prod input[type=text],.fila-prod input[type=number]{padding:6px 8px; font-size:12.5px}
-.aviso-iva{background:#FFF6DA; border:1px solid #F3DDA0; padding:10px 12px; border-radius:var(--radio); font-size:12.5px; margin-bottom:12px}
+.vacio{text-align:center; color:var(--gris-2); padding:30px 20px; font-size:13px}
+.pista{font-size:12.5px; color:var(--gris); line-height:1.55}
+.aviso-iva{
+  background:var(--amarillo-luz); border:1px solid #F0DCA4; padding:11px 13px;
+  border-radius:var(--r-s); font-size:12.5px; line-height:1.55;
+}
+.ruta{
+  display:none; max-width:1340px; margin:16px auto -6px; padding:0 20px;
+  font-size:12px; color:var(--gris);
+}
+.ruta span{background:#fff; border:1px solid var(--linea); padding:4px 11px; border-radius:20px}
 
-.vacio{text-align:center; color:var(--gris); padding:26px; font-size:13px}
-@media(max-width:960px){ main{grid-template-columns:1fr} .resumen{position:static} .c4,.c3{grid-template-columns:repeat(2,minmax(0,1fr))} }
-@media print{ #barra,#historial,.acciones,.modal{display:none} }
+/* ===========================================================
+   ADAPTABLE
+   =========================================================== */
+@media(max-width:1080px){
+  main{grid-template-columns:1fr}
+  .panel{position:static}
+  .acciones{flex-direction:row}
+}
+@media(max-width:820px){
+  .barra{flex-wrap:wrap; height:auto; padding:10px 14px; gap:10px}
+  .tipos{order:3; width:100%; margin:0}
+  .tipo-btn{flex:1}
+  .marca small{display:none}
+  main,#historial{padding:0 12px}
+  .c4,.c3,.c2{grid-template-columns:1fr}
+  .hist-herramientas{width:100%; margin-left:0}
+  .hist-herramientas input,.hist-herramientas select,.buscador-caja input{min-width:0; width:100%}
+  .buscador-caja{flex:1 1 100%}
+}
+@media print{
+  .barra,#historial,.acciones,.modal,.plegador,#avisos{display:none !important}
+  main{display:block}
+}
 </style>
 </head>
 <body>
 
-<header id="barra">
-  <img src="NLOGO.png" alt="AB Technology" onerror="this.style.display='none'">
-  <div class="marca">AB TECHNOLOGY BY<small>Sistema de cotizaciones</small></div>
-  <div class="sep"></div>
+<header class="barra">
+  <div class="marca">
+    <img src="NLOGO.png" alt="AB Technology" onerror="this.style.display='none'">
+    <div>AB TECHNOLOGY BY<small>Documentos comerciales</small></div>
+  </div>
+
+  <div class="tipos">
+    <button type="button" class="tipo-btn activa" data-tipo="cotizacion" onclick="cambiarTipo('cotizacion')">Cotización</button>
+    <button type="button" class="tipo-btn" data-tipo="nota_entrega" onclick="cambiarTipo('nota_entrega')">Nota de entrega</button>
+    <button type="button" class="tipo-btn" data-tipo="factura" onclick="cambiarTipo('factura')">Factura</button>
+  </div>
+
   <div class="estado-con"><i class="punto" id="punto"></i><span id="txtCon">Conectando…</span></div>
-  <button class="btn btn-linea" onclick="nuevoPresupuesto()">Nuevo documento</button>
-  <button class="btn btn-linea" onclick="abrirConfig()">Configuración</button>
+  <button class="btn btn-linea" onclick="nuevoPresupuesto()">Nuevo</button>
+  <button class="btn btn-linea" onclick="abrirConfig()">Ajustes</button>
 </header>
 
+<div class="ruta" id="ruta"></div>
+
 <main>
-  <div class="hoja">
+  <div class="editor">
     <input type="hidden" id="editId">
     <input type="hidden" id="origenNumero">
 
-    <div class="tipos">
-      <button type="button" class="tipo-btn activa" data-tipo="cotizacion" onclick="cambiarTipo('cotizacion')">Cotización</button>
-      <button type="button" class="tipo-btn" data-tipo="nota_entrega" onclick="cambiarTipo('nota_entrega')">Nota de entrega</button>
-      <button type="button" class="tipo-btn" data-tipo="factura" onclick="cambiarTipo('factura')">Factura</button>
-    </div>
-
-    <!-- CLIENTE -->
-    <div class="bloque">
-      <h2 class="titulo">Datos del cliente</h2>
-      <div class="rejilla c2">
-        <div>
-          <label class="campo" for="cl_nombre">Nombre o razón social</label>
-          <input id="cl_nombre" placeholder="Inversiones Globales, C.A." list="listaClientes" autocomplete="off">
-          <datalist id="listaClientes"></datalist>
-        </div>
-        <div>
-          <label class="campo" for="cl_rif">RIF / C.I.</label>
-          <input id="cl_rif" placeholder="J-12345678-9">
-        </div>
-      </div>
-      <div class="rejilla c2" style="margin-top:12px">
-        <div>
-          <label class="campo" for="cl_direccion">Dirección fiscal</label>
-          <textarea id="cl_direccion" rows="2" placeholder="Av. Principal, Edif..., Piso..., Ciudad, Estado"></textarea>
-        </div>
-        <div class="rejilla" style="align-content:start">
+    <!-- ========== CLIENTE ========== -->
+    <article class="tarjeta">
+      <div class="t-cab"><h2>Cliente</h2><span class="nota">Escribe el nombre y se completan los datos si ya lo atendiste</span></div>
+      <div class="t-cuerpo">
+        <div class="rejilla c3">
+          <div class="ancho-2">
+            <label class="campo" for="cl_nombre">Nombre o razón social</label>
+            <input id="cl_nombre" placeholder="Inversiones Globales, C.A." list="listaClientes" autocomplete="off">
+            <datalist id="listaClientes"></datalist>
+          </div>
           <div>
-            <label class="campo" for="cl_contacto">Persona de contacto</label>
-            <input id="cl_contacto" placeholder="Ing. María Pérez">
-          </div>
-          <div class="rejilla c2">
-            <div>
-              <label class="campo" for="cl_telefono">Teléfono</label>
-              <input id="cl_telefono" placeholder="+58 412-0000000">
-            </div>
-            <div>
-              <label class="campo" for="cl_email">Correo</label>
-              <input id="cl_email" type="email" placeholder="cliente@correo.com">
-            </div>
+            <label class="campo" for="cl_rif">RIF / C.I.</label>
+            <input id="cl_rif" placeholder="J-12345678-9">
           </div>
         </div>
       </div>
-    </div>
+      <button type="button" class="plegador" data-abre="masCliente">
+        <span class="chevron">▶</span> Dirección, teléfono y contacto
+      </button>
+      <div class="plegable" id="masCliente">
+        <div class="rejilla c2">
+          <div>
+            <label class="campo" for="cl_direccion">Dirección fiscal</label>
+            <textarea id="cl_direccion" rows="2" placeholder="Av. Principal, Edif..., Piso..., Ciudad, Estado"></textarea>
+          </div>
+          <div class="rejilla">
+            <div>
+              <label class="campo" for="cl_contacto">Persona de contacto</label>
+              <input id="cl_contacto" placeholder="Ing. María Pérez">
+            </div>
+            <div class="rejilla c2">
+              <div>
+                <label class="campo" for="cl_telefono">Teléfono</label>
+                <input id="cl_telefono" placeholder="+58 412-0000000">
+              </div>
+              <div>
+                <label class="campo" for="cl_email">Correo</label>
+                <input id="cl_email" type="email" placeholder="cliente@correo.com">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
 
-    <!-- DATOS DEL TALONARIO (solo facturas) -->
-    <div class="bloque" id="bloqueFactura" style="display:none">
-      <h2 class="titulo">Datos del talonario</h2>
-      <p class="pista">Copia aquí los números impresos en la factura física. El sistema no los genera: solo te sugiere el siguiente.</p>
-      <div class="rejilla c4">
-        <div>
-          <label class="campo" for="f_numero">N° de factura</label>
-          <input id="f_numero" placeholder="000012" autocomplete="off">
+    <!-- ========== TALONARIO (solo factura) ========== -->
+    <article class="tarjeta" id="bloqueFactura" style="display:none">
+      <div class="t-cab"><h2>Datos del talonario</h2><span class="nota">Cópialos de la factura física</span></div>
+      <div class="t-cuerpo">
+        <div class="rejilla c4">
+          <div>
+            <label class="campo" for="f_numero">N° de factura</label>
+            <input id="f_numero" placeholder="000012" autocomplete="off">
+          </div>
+          <div>
+            <label class="campo" for="f_control">N° de control</label>
+            <input id="f_control" placeholder="00000012" autocomplete="off">
+          </div>
+          <div style="display:flex; align-items:flex-end">
+            <button class="btn" onclick="sugerirFolio()" style="width:100%">Sugerir siguiente</button>
+          </div>
+          <div>
+            <label class="campo" for="f_moneda_captura">Escribir precios en</label>
+            <select id="f_moneda_captura">
+              <option value="Bs">Bs Bolívares</option>
+              <option value="$">$ Dólares</option>
+              <option value="€">€ Euros</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label class="campo" for="f_control">N° de control</label>
-          <input id="f_control" placeholder="00000012" autocomplete="off">
+
+        <div class="rejilla c4" id="filaTasa" style="display:none; margin-top:14px">
+          <div>
+            <label class="campo" for="f_tasa_usada">Tasa de cambio</label>
+            <input id="f_tasa_usada" type="number" step="0.0001" min="0" placeholder="238.5500">
+          </div>
+          <div style="grid-column:span 3; display:flex; align-items:flex-end">
+            <div id="avisoTasa" class="pista" style="padding-bottom:9px"></div>
+          </div>
         </div>
-        <div style="display:flex; align-items:end">
-          <button class="btn btn-mini" onclick="sugerirFolio()" style="width:100%; padding:9px">Sugerir siguiente</button>
+
+        <div class="rejilla c4" style="margin-top:14px">
+          <div>
+            <label class="campo" for="f_forma">Forma de pago</label>
+            <select id="f_forma">
+              <option value="">Sin marcar</option>
+              <option value="credito">Crédito</option>
+              <option value="contado">Contado</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="cheque">Cheque</option>
+              <option value="debito">Tarjeta de débito</option>
+              <option value="tarjeta_credito">Tarjeta de crédito</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label class="campo" for="f_referencia">N° de referencia</label>
+            <input id="f_referencia" placeholder="004578991">
+          </div>
+          <div>
+            <label class="campo" for="f_exento">Total exento (Bs.)</label>
+            <input id="f_exento" type="number" step="0.01" min="0" value="0">
+          </div>
+          <div>
+            <label class="campo" for="f_ajustes">Ajustes (Bs.)</label>
+            <input id="f_ajustes" type="number" step="0.01" value="0">
+          </div>
         </div>
-        <div>
-          <label class="campo" for="f_moneda_captura">Escribir precios en</label>
-          <select id="f_moneda_captura">
-            <option value="Bs">Bs Bolívares</option>
-            <option value="$">$ Dólares</option>
-            <option value="€">€ Euros</option>
-          </select>
+      </div>
+    </article>
+
+    <!-- ========== ÍTEMS ========== -->
+    <article class="tarjeta">
+      <div class="t-cab">
+        <h2>Productos y servicios</h2>
+        <span class="nota">Arrastra <b>⠿</b> para reordenar</span>
+      </div>
+      <div class="envoltura-tabla">
+        <table id="tablaItems">
+          <thead><tr>
+            <th style="width:28px"></th>
+            <th>Descripción</th>
+            <th style="width:82px">Cant.</th>
+            <th style="width:88px">Unidad</th>
+            <th style="width:118px">P. unitario</th>
+            <th style="width:112px; text-align:right">Total</th>
+            <th style="width:38px"></th>
+          </tr></thead>
+          <tbody id="items"></tbody>
+        </table>
+      </div>
+      <div class="acciones-items">
+        <button class="btn" onclick="nuevaFila()">+ Agregar ítem</button>
+        <button class="btn btn-oscuro" onclick="abrirCatalogo()">Buscar en el catálogo</button>
+        <span class="atajo"><kbd>Ctrl</kbd>+<kbd>K</kbd> catálogo · <kbd>Enter</kbd> nueva línea</span>
+      </div>
+      <div class="t-cuerpo" style="padding-top:16px">
+        <div class="rejilla c4" id="bloqueDescuento">
+          <div id="campoDescTipo">
+            <label class="campo" for="d_desc_tipo">Tipo de descuento</label>
+            <select id="d_desc_tipo"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto fijo</option></select>
+          </div>
+          <div id="campoDescValor">
+            <label class="campo" for="d_desc_valor">Valor del descuento</label>
+            <input id="d_desc_valor" type="number" step="0.01" min="0" value="0">
+          </div>
+          <div style="display:flex; align-items:flex-end; padding-bottom:9px">
+            <label class="interruptor"><input type="checkbox" id="d_con_iva"> Aplicar IVA</label>
+          </div>
+          <div>
+            <label class="campo" for="d_iva_pct">Alícuota IVA (%)</label>
+            <input id="d_iva_pct" type="number" step="0.01" min="0" value="16">
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- ========== TRABAJO REALIZADO (solo nota) ========== -->
+    <article class="tarjeta" id="bloqueTrabajo" style="display:none">
+      <div class="t-cab"><h2>Detalle del trabajo realizado</h2><span class="nota">Lo que el cliente quiere ver</span></div>
+      <div class="t-cuerpo">
+        <textarea id="d_trabajo" rows="7" placeholder="1. Retiro del switch dañado y sustitución por uno administrable de 24 puertos.&#10;2. Recableado de 8 puntos de red en el depósito, con certificación de cada punto.&#10;3. Instalación de a2 Administrativo en tres estaciones y migración del inventario.&#10;4. Capacitación al personal (4 horas)."></textarea>
+      </div>
+    </article>
+
+    <!-- ========== DOCUMENTO Y CONDICIONES ========== -->
+    <article class="tarjeta">
+      <div class="t-cab"><h2>Documento</h2></div>
+      <div class="t-cuerpo">
+        <div class="rejilla c4">
+          <div>
+            <label class="campo" for="d_fecha">Fecha</label>
+            <input id="d_fecha" type="date">
+          </div>
+          <div>
+            <label class="campo" for="d_moneda">Moneda</label>
+            <select id="d_moneda">
+              <option value="$">$ Dólares</option>
+              <option value="€">€ Euros</option>
+              <option value="Bs">Bs Bolívares</option>
+            </select>
+          </div>
+          <div id="campoValidez">
+            <label class="campo" for="d_validez">Validez (días)</label>
+            <input id="d_validez" type="number" min="0" value="15">
+          </div>
+          <div>
+            <label class="campo" for="d_estado">Estado</label>
+            <select id="d_estado"></select>
+          </div>
         </div>
       </div>
 
-      <div class="rejilla c4" id="filaTasa" style="margin-top:14px; display:none">
-        <div>
-          <label class="campo" for="f_tasa_usada">Tasa de cambio (Bs por unidad)</label>
-          <input id="f_tasa_usada" type="number" step="0.0001" min="0" placeholder="238.5500">
+      <button type="button" class="plegador" data-abre="masCondiciones">
+        <span class="chevron">▶</span> Condiciones, notas y tasa BCV
+      </button>
+      <div class="plegable" id="masCondiciones">
+        <div class="rejilla c2">
+          <div id="campoEntrega">
+            <label class="campo" for="d_entrega">Tiempo de entrega</label>
+            <input id="d_entrega" placeholder="5 días hábiles después del anticipo">
+          </div>
+          <div>
+            <label class="campo" for="d_tasa">Tasa BCV (referencia en el PDF)</label>
+            <input id="d_tasa" type="number" step="0.01" min="0" placeholder="0.00">
+          </div>
         </div>
-        <div style="grid-column:span 3; display:flex; align-items:end">
-          <div id="avisoTasa" class="pista" style="margin:0 0 8px"></div>
+        <div style="margin-top:14px">
+          <label class="campo" for="d_cond_pago">Condiciones de pago</label>
+          <textarea id="d_cond_pago" rows="2" placeholder="50% de anticipo y 50% contra entrega."></textarea>
         </div>
-      </div>
-
-      <div class="rejilla c2" style="margin-top:14px">
-        <div>
-          <label class="campo" for="f_forma">Forma de pago</label>
-          <select id="f_forma">
-            <option value="">Sin marcar</option>
-            <option value="credito">Crédito</option>
-            <option value="contado">Contado</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="cheque">Cheque</option>
-            <option value="debito">Tarjeta de débito</option>
-            <option value="tarjeta_credito">Tarjeta de crédito</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="otro">Otro</option>
-          </select>
+        <div class="rejilla c2" style="margin-top:14px">
+          <label class="interruptor"><input type="checkbox" id="d_con_nota"> Incluir nota BCV en el PDF</label>
+          <label class="interruptor"><input type="checkbox" id="d_con_extra"> Agregar comentarios</label>
         </div>
-        <div>
-          <label class="campo" for="f_referencia">N° de referencia / detalle</label>
-          <input id="f_referencia" placeholder="004578991">
+        <div id="areaExtra" style="display:none; margin-top:14px">
+          <label class="campo" for="d_nota_extra">Comentarios adicionales</label>
+          <textarea id="d_nota_extra" rows="2" placeholder="Garantía de 6 meses, instalación incluida…"></textarea>
         </div>
       </div>
 
-      <div class="rejilla c2" style="margin-top:14px">
-        <div>
-          <label class="campo" for="f_exento">Total exento (Bs.)</label>
-          <input id="f_exento" type="number" step="0.01" min="0" value="0">
-        </div>
-        <div>
-          <label class="campo" for="f_ajustes">Ajustes (Bs.)</label>
-          <input id="f_ajustes" type="number" step="0.01" value="0">
-        </div>
+      <button type="button" class="plegador" data-abre="masPagos">
+        <span class="chevron">▶</span> Formas de pago en el PDF
+        <span class="conteo" id="conteoPagos">0</span>
+      </button>
+      <div class="plegable" id="masPagos">
+        <div class="rejilla c2" id="metodosLista"></div>
+        <button class="btn btn-mini" style="margin-top:12px" onclick="abrirConfig('pagos')">Administrar formas de pago</button>
       </div>
-      <div class="aviso-iva" style="margin-top:14px">
-        Los montos de la factura van en <b>bolívares</b>, igual que el talonario. Si conviertes una
-        cotización en dólares, la app pasa los precios a Bs con la tasa que indiques.
-      </div>
-    </div>
-
-    <!-- DOCUMENTO -->
-    <div class="bloque">
-      <h2 class="titulo">Datos del documento</h2>
-      <div class="rejilla c4">
-        <div>
-          <label class="campo" for="d_fecha">Fecha</label>
-          <input id="d_fecha" type="date">
-        </div>
-        <div>
-          <label class="campo" for="d_moneda">Moneda</label>
-          <select id="d_moneda"><option value="$">$ Dólares</option><option value="€">€ Euros</option><option value="Bs">Bs Bolívares</option></select>
-        </div>
-        <div>
-          <label class="campo" for="d_tasa">Tasa BCV (opcional)</label>
-          <input id="d_tasa" type="number" step="0.01" min="0" placeholder="0.00">
-        </div>
-        <div id="campoValidez">
-          <label class="campo" for="d_validez">Validez (días)</label>
-          <input id="d_validez" type="number" min="0" value="15">
-        </div>
-      </div>
-      <div class="rejilla c2" style="margin-top:12px">
-        <div>
-          <label class="campo" for="d_estado">Estado</label>
-          <select id="d_estado">
-            <option value="borrador">Borrador</option>
-            <option value="enviado">Enviada al cliente</option>
-            <option value="aprobado">Aprobada</option>
-            <option value="rechazado">Rechazada</option>
-            <option value="anulado">Anulada</option>
-          </select>
-        </div>
-        <div id="campoEntrega">
-          <label class="campo" for="d_entrega">Tiempo de entrega</label>
-          <input id="d_entrega" placeholder="5 días hábiles después del anticipo">
-        </div>
-      </div>
-    </div>
-
-    <!-- ÍTEMS -->
-    <div class="bloque">
-      <h2 class="titulo">Productos y servicios</h2>
-      <table id="tablaItems">
-        <thead><tr>
-          <th>DESCRIPCIÓN</th><th style="width:80px">CANT.</th><th style="width:90px">UNIDAD</th>
-          <th style="width:120px">P. UNITARIO</th><th style="width:110px" class="num">TOTAL</th><th style="width:34px"></th>
-        </tr></thead>
-        <tbody id="items"></tbody>
-      </table>
-      <button class="btn" style="margin-top:12px" onclick="nuevaFila()">+ Agregar ítem</button>
-      <button class="btn btn-oscuro" style="margin-top:12px" onclick="abrirCatalogo()">🔍 Buscar en el catálogo</button>
-      <span style="font-size:11.5px; color:var(--gris); margin-left:8px">Presiona Enter en el precio para agregar otra línea.</span>
-    </div>
-
-    <!-- TRABAJO REALIZADO (solo notas de entrega) -->
-    <div class="bloque" id="bloqueTrabajo" style="display:none">
-      <h2 class="titulo">Detalle del trabajo realizado</h2>
-      <p class="pista">Describe los procesos ejecutados. Es lo que el cliente quiere ver en la nota de entrega, aunque en la cotización lo hayas resumido.</p>
-      <textarea id="d_trabajo" rows="8" placeholder="1. Retiro del switch dañado y sustitución por uno administrable de 24 puertos.&#10;2. Recableado de 8 puntos de red en el depósito, con certificación de cada punto.&#10;3. Instalación de a2 Administrativo en tres estaciones y migración del inventario.&#10;4. Capacitación al personal (4 horas)."></textarea>
-    </div>
-
-    <!-- DESCUENTO E IVA -->
-    <div class="bloque" id="bloqueDescuento">
-      <h2 class="titulo">Descuento e impuesto</h2>
-      <div class="rejilla c4">
-        <div id="campoDescTipo">
-          <label class="campo" for="d_desc_tipo">Tipo de descuento</label>
-          <select id="d_desc_tipo"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto fijo</option></select>
-        </div>
-        <div id="campoDescValor">
-          <label class="campo" for="d_desc_valor">Valor del descuento</label>
-          <input id="d_desc_valor" type="number" step="0.01" min="0" value="0">
-        </div>
-        <div class="interruptor"><input type="checkbox" id="d_con_iva"><label for="d_con_iva">Aplicar IVA</label></div>
-        <div>
-          <label class="campo" for="d_iva_pct">Alícuota IVA (%)</label>
-          <input id="d_iva_pct" type="number" step="0.01" min="0" value="16">
-        </div>
-      </div>
-    </div>
-
-    <!-- CONDICIONES -->
-    <div class="bloque">
-      <h2 class="titulo">Condiciones y notas</h2>
-      <label class="campo" for="d_cond_pago">Condiciones de pago</label>
-      <textarea id="d_cond_pago" rows="2" placeholder="50% de anticipo y 50% contra entrega."></textarea>
-      <div class="rejilla c2" style="margin-top:12px">
-        <div class="interruptor"><input type="checkbox" id="d_con_nota"><label for="d_con_nota">Incluir nota BCV en el PDF</label></div>
-        <div class="interruptor"><input type="checkbox" id="d_con_extra"><label for="d_con_extra">Agregar comentarios adicionales</label></div>
-      </div>
-      <div id="areaExtra" style="display:none; margin-top:12px">
-        <label class="campo" for="d_nota_extra">Comentarios adicionales</label>
-        <textarea id="d_nota_extra" rows="2" placeholder="Garantía de 6 meses, instalación incluida…"></textarea>
-      </div>
-    </div>
-
-    <!-- MÉTODOS DE PAGO -->
-    <div class="bloque">
-      <h2 class="titulo">Formas de pago que aparecerán en el PDF</h2>
-      <div class="rejilla c2" id="metodosLista"></div>
-      <button class="btn btn-mini" style="margin-top:10px" onclick="abrirConfig('pagos')">Administrar formas de pago</button>
-    </div>
+    </article>
   </div>
 
-  <!-- RESUMEN -->
-  <aside class="resumen">
+  <!-- ========== PANEL ========== -->
+  <aside class="panel">
     <div id="avisoEdicion" class="aviso-edicion" style="display:none"></div>
     <div class="caja-total">
       <div class="fila"><span>Subtotal</span><b id="t_bruto">0,00</b></div>
@@ -412,42 +642,46 @@ table{width:100%; border-collapse:collapse}
       <div class="bs" id="t_divisa" style="display:none"></div>
     </div>
     <div class="acciones">
-      <button class="btn btn-primario" id="btnGuardar" onclick="guardar()">Guardar cotización</button>
+      <button class="btn btn-primario" id="btnGuardar" onclick="guardar()">Guardar</button>
       <button class="btn" id="btnCancelar" style="display:none" onclick="nuevoPresupuesto()">Cancelar edición</button>
     </div>
   </aside>
 </main>
 
-<!-- HISTORIAL -->
+<!-- ========== HISTORIAL ========== -->
 <section id="historial">
-  <div class="barra-hist">
-    <h2 class="titulo" style="margin:0; flex:0 0 auto">Archivo de cotizaciones</h2>
-    <div class="sep" style="flex:1"></div>
-    <input id="h_q" placeholder="Buscar por cliente, RIF o folio…">
-    <select id="h_tipo">
-      <option value="">Todos los documentos</option>
-      <option value="cotizacion">Solo cotizaciones</option>
-      <option value="nota_entrega">Solo notas de entrega</option>
-      <option value="factura">Solo facturas</option>
-    </select>
-    <select id="h_estado">
-      <option value="">Todos los estados</option>
-      <option value="borrador">Borrador</option>
-      <option value="enviado">Enviada</option>
-      <option value="aprobado">Aprobada</option>
-      <option value="entregada">Entregada</option>
-      <option value="pagada">Pagada</option>
-      <option value="emitida">Emitida</option>
-      <option value="rechazado">Rechazada</option>
-      <option value="anulado">Anulada</option>
-    </select>
+  <div class="hist-cab">
+    <h2>Archivo de documentos</h2>
+    <div class="hist-herramientas">
+      <div class="buscador-caja"><input id="h_q" placeholder="Cliente, RIF o folio…" autocomplete="off"></div>
+      <select id="h_tipo">
+        <option value="">Todos los documentos</option>
+        <option value="cotizacion">Solo cotizaciones</option>
+        <option value="nota_entrega">Solo notas de entrega</option>
+        <option value="factura">Solo facturas</option>
+      </select>
+      <select id="h_estado">
+        <option value="">Todos los estados</option>
+        <option value="borrador">Borrador</option>
+        <option value="enviado">Enviada</option>
+        <option value="aprobado">Aprobada</option>
+        <option value="entregada">Entregada</option>
+        <option value="emitida">Emitida</option>
+        <option value="pagada">Pagada</option>
+        <option value="rechazado">Rechazada</option>
+        <option value="anulado">Anulada</option>
+      </select>
+    </div>
   </div>
-  <table id="tablaHist">
-    <thead><tr>
-      <th>FOLIO</th><th>FECHA</th><th>CLIENTE</th><th>ESTADO</th><th class="num">MONTO</th><th>ACCIONES</th>
-    </tr></thead>
-    <tbody id="h_tbody"></tbody>
-  </table>
+  <div class="tabla-caja">
+    <table id="tablaHist">
+      <thead><tr>
+        <th>Folio</th><th>Fecha</th><th>Cliente</th><th>Estado</th>
+        <th style="text-align:right">Monto</th><th>Acciones</th>
+      </tr></thead>
+      <tbody id="h_tbody"></tbody>
+    </table>
+  </div>
   <div class="paginacion">
     <button class="btn btn-mini" id="h_prev" onclick="cambiarPagina(-1)">‹ Anterior</button>
     <span id="h_info">—</span>
@@ -455,23 +689,23 @@ table{width:100%; border-collapse:collapse}
   </div>
 </section>
 
-<!-- MODAL BUSCADOR DE PRODUCTOS -->
+<!-- ========== MODAL CATÁLOGO ========== -->
 <div class="modal" id="modalCatalogo">
-  <div class="modal-caja" style="max-width:720px">
+  <div class="modal-caja" style="max-width:740px">
     <div class="modal-cab">
       <h3>Catálogo de productos</h3>
       <button class="btn btn-linea" onclick="cerrarCatalogo()">Cerrar</button>
     </div>
     <div class="modal-cuerpo">
-      <input id="buscaProd" placeholder="Escribe para filtrar: hotel, punto de venta, renovación…" autocomplete="off">
-      <div id="avisoIva" class="aviso-iva" style="display:none; margin-top:12px"></div>
-      <div class="buscador" id="listaProd" style="margin-top:12px"></div>
-      <p class="pista" style="margin:12px 0 0">Haz clic en un producto para agregarlo a la cotización.</p>
+      <input id="buscaProd" placeholder="Filtra: hotel, punto de venta, renovación…" autocomplete="off">
+      <div id="avisoIva" class="aviso-iva" style="display:none; margin-top:14px"></div>
+      <div class="buscador" id="listaProd" style="margin-top:14px"></div>
+      <p class="pista" style="margin-top:14px">Haz clic en un producto para agregarlo al documento.</p>
     </div>
   </div>
 </div>
 
-<!-- MODAL CONFIGURACIÓN -->
+<!-- ========== MODAL CONFIGURACIÓN ========== -->
 <div class="modal" id="modalConfig">
   <div class="modal-caja">
     <div class="modal-cab">
@@ -501,19 +735,19 @@ table{width:100%; border-collapse:collapse}
 
       <div class="panel-pest" id="p_valores">
         <div class="rejilla c4">
-          <div><label class="campo">Prefijo de cotizaciones</label><input id="c_prefijo" maxlength="8"></div>
-          <div><label class="campo">Prefijo de notas</label><input id="c_prefijo_nota" maxlength="8"></div>
+          <div><label class="campo">Prefijo cotizaciones</label><input id="c_prefijo" maxlength="8"></div>
+          <div><label class="campo">Prefijo notas</label><input id="c_prefijo_nota" maxlength="8"></div>
           <div><label class="campo">IVA por defecto (%)</label><input id="c_iva" type="number" step="0.01"></div>
-          <div><label class="campo">Validez por defecto (días)</label><input id="c_validez" type="number"></div>
+          <div><label class="campo">Validez (días)</label><input id="c_validez" type="number"></div>
         </div>
-        <div class="rejilla c2" style="margin-top:12px">
+        <div class="rejilla c2" style="margin-top:14px">
           <div><label class="campo">Moneda por defecto</label>
             <select id="c_moneda"><option value="$">$ Dólares</option><option value="€">€ Euros</option></select></div>
           <div><label class="campo">Tiempo de entrega por defecto</label><input id="c_entrega"></div>
         </div>
-        <div style="margin-top:12px"><label class="campo">Condiciones de pago por defecto</label>
+        <div style="margin-top:14px"><label class="campo">Condiciones de pago por defecto</label>
           <textarea id="c_cond" rows="2"></textarea></div>
-        <div style="margin-top:12px"><label class="campo">Texto de la nota BCV (usa {moneda} para insertar la moneda)</label>
+        <div style="margin-top:14px"><label class="campo">Texto de la nota BCV (usa {moneda})</label>
           <textarea id="c_nota" rows="3"></textarea></div>
       </div>
 
@@ -524,77 +758,77 @@ table{width:100%; border-collapse:collapse}
 
       <div class="panel-pest" id="p_catalogo">
         <div class="aviso-iva">
-          <b>Importar la lista de a2:</b> abre
-          <span style="text-decoration:underline">a2.com.ve/productos/lista-de-precios</span>,
-          selecciona la tabla completa, cópiala (Ctrl+C) y pégala aquí abajo. La app reconoce
-          nombres, precios y categorías sola.
+          <b>Importar la lista de a2:</b> abre a2.com.ve/productos/lista-de-precios, selecciona
+          la tabla completa, cópiala y pégala aquí. Se reconocen nombres, precios y categorías.
         </div>
-        <textarea id="pegarLista" rows="5" placeholder="a2 Punto de Venta Configurable&#9;€152,31&#10;a2 Contabilidad&#9;€358,46"></textarea>
-        <div class="rejilla c4" style="margin-top:10px; align-items:end">
+        <textarea id="pegarLista" rows="5" style="margin-top:14px" placeholder="a2 Punto de Venta Configurable&#9;€152,31&#10;a2 Contabilidad&#9;€358,46"></textarea>
+        <div class="rejilla c4" style="margin-top:12px; align-items:end">
           <div>
             <label class="campo">Al importar</label>
             <select id="modoImport">
-              <option value="agregar">Agregar a lo que ya existe</option>
-              <option value="reemplazar">Reemplazar todo el catálogo</option>
+              <option value="agregar">Agregar a lo existente</option>
+              <option value="reemplazar">Reemplazar todo</option>
             </select>
           </div>
           <div>
             <label class="campo">Moneda</label>
             <select id="monedaImport"><option value="€">€ Euros</option><option value="$">$ Dólares</option></select>
           </div>
-          <div class="interruptor"><input type="checkbox" id="ivaImport" checked><label for="ivaImport">Precios con IVA incluido</label></div>
+          <div style="padding-bottom:9px">
+            <label class="interruptor"><input type="checkbox" id="ivaImport" checked> Precios con IVA</label>
+          </div>
           <button class="btn btn-oscuro" onclick="importarLista()">Importar</button>
         </div>
 
-        <hr style="border:0; border-top:1px solid var(--linea); margin:20px 0">
+        <hr style="border:0; border-top:1px solid var(--linea); margin:22px 0">
 
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">
           <b style="font-size:13px" id="totalCat">Productos</b>
           <div style="flex:1"></div>
-          <button class="btn btn-mini" onclick="agregarProdCfg()">+ Agregar producto</button>
+          <button class="btn btn-mini" onclick="agregarProdCfg()">+ Agregar</button>
           <button class="btn btn-oscuro" onclick="guardarCatalogo()">Guardar catálogo</button>
         </div>
-        <div class="fila-prod" style="font-size:11px; color:var(--gris); font-weight:700; border-bottom:1px solid var(--linea)">
-          <span>NOMBRE</span><span>CATEGORÍA</span><span>PRECIO</span><span>MONEDA</span><span></span>
+        <div class="fila-prod" style="font-size:10.5px; color:var(--gris); font-weight:700; text-transform:uppercase; letter-spacing:.4px">
+          <span>Nombre</span><span>Categoría</span><span>Precio</span><span>Moneda</span><span></span>
         </div>
         <div id="listaCatCfg" style="max-height:38vh; overflow:auto"></div>
       </div>
 
       <div class="panel-pest" id="p_talonario">
-        <p class="pista">Lo que aparece preimpreso en tu talonario. Se usa solo en el PDF de las facturas.</p>
-        <div class="rejilla c2">
+        <p class="pista">Lo que aparece preimpreso en tu talonario. Solo se usa en el PDF de las facturas.</p>
+        <div class="rejilla c2" style="margin-top:14px">
           <div><label class="campo">Eslogan bajo el nombre</label><input id="tf_eslogan"></div>
           <div><label class="campo">Prefijo del N° de control</label><input id="tf_prefijo" maxlength="6" placeholder="00"></div>
         </div>
-        <div style="margin-top:12px"><label class="campo">Domicilio fiscal, primera línea</label><input id="tf_dom1"></div>
-        <div style="margin-top:12px"><label class="campo">Domicilio fiscal, segunda línea</label><input id="tf_dom2"></div>
-        <div style="margin-top:12px">
-          <label class="campo">Texto legal de la imprenta (el renglón diminuto del pie)</label>
+        <div style="margin-top:14px"><label class="campo">Domicilio fiscal, línea 1</label><input id="tf_dom1"></div>
+        <div style="margin-top:14px"><label class="campo">Domicilio fiscal, línea 2</label><input id="tf_dom2"></div>
+        <div style="margin-top:14px">
+          <label class="campo">Texto legal de la imprenta</label>
           <textarea id="tf_imprenta" rows="3" placeholder="Cópialo tal cual del talonario: datos de la imprenta, providencia, rango de numeración…"></textarea>
         </div>
-        <div class="rejilla c2" style="margin-top:12px">
+        <div class="rejilla c2" style="margin-top:14px">
           <div><label class="campo">Marca de agua</label><input id="tf_leyenda"></div>
           <div>
             <label class="campo">Céntimos del IVA</label>
             <select id="tf_redondeo">
-              <option value="truncar">Truncar (como en tu talonario)</option>
+              <option value="truncar">Truncar (como tu talonario)</option>
               <option value="redondear">Redondear</option>
             </select>
           </div>
         </div>
-        <div style="margin-top:12px"><label class="campo">Nota al pie</label><textarea id="tf_nota" rows="2"></textarea></div>
+        <div style="margin-top:14px"><label class="campo">Nota al pie</label><textarea id="tf_nota" rows="2"></textarea></div>
       </div>
 
       <div class="panel-pest" id="p_conexion">
         <div><label class="campo">Dirección del servidor</label>
           <input id="con_url" placeholder="https://tu-servicio.onrender.com"></div>
-        <div style="margin-top:12px"><label class="campo">Clave de acceso (API_KEY, opcional)</label>
-          <input id="con_key" type="password" placeholder="Déjala vacía si el servidor no la usa"></div>
-        <p style="font-size:12.5px; color:var(--gris)">Estos dos datos se guardan solo en este equipo. El resto de la configuración se guarda en la base de datos y la comparten todos los equipos.</p>
-        <button class="btn" onclick="probarConexion()">Probar conexión</button>
+        <div style="margin-top:14px"><label class="campo">Clave de acceso (API_KEY)</label>
+          <input id="con_key" type="password" placeholder="Vacía si el servidor no la usa"></div>
+        <p class="pista" style="margin-top:12px">Estos dos datos se guardan solo en este equipo. El resto de la configuración vive en la base de datos y la comparten todos los equipos.</p>
+        <button class="btn" style="margin-top:12px" onclick="probarConexion()">Probar conexión</button>
       </div>
 
-      <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid var(--linea); padding-top:16px">
+      <div class="pie-modal">
         <button class="btn" onclick="cerrarConfig()">Cancelar</button>
         <button class="btn btn-oscuro" onclick="guardarConfig()">Guardar configuración</button>
       </div>
@@ -605,6 +839,7 @@ table{width:100%; border-collapse:collapse}
 <div id="avisos"></div>
 
 <script>
+
 /* =======================================================
    1. CONEXIÓN
    ======================================================= */
@@ -654,6 +889,7 @@ let SIN_CARGAR = false;
 let TIPO = 'cotizacion';
 let CATALOGO = [];
 let CLIENTES = [];
+let ARRASTRANDO = null;
 
 const ESTADOS = {
   cotizacion:   [['borrador','Borrador'],['enviado','Enviada al cliente'],['aprobado','Aprobada'],['rechazado','Rechazada'],['anulado','Anulada']],
@@ -699,6 +935,23 @@ function pintarEstados(select, tipo, valor){
 
 function cambiarTipo(t){ TIPO = t; aplicarTipo(); }
 
+function contarPagos(){
+  const n = document.querySelectorAll('.mp-check:checked').length;
+  const el = $('conteoPagos');
+  if (el) el.textContent = n;
+}
+
+function pintarRuta(){
+  const r = $('ruta');
+  const origen = $('origenNumero').value;
+  if (!origen){ r.style.display = 'none'; return; }
+  r.style.display = 'block';
+  r.innerHTML = '';
+  const s = document.createElement('span');
+  s.textContent = 'Proviene de ' + origen;
+  r.appendChild(s);
+}
+
 function aplicarTipo(){
   const nota = esNota(), fac = esFactura();
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.toggle('activa', b.dataset.tipo === TIPO));
@@ -720,6 +973,8 @@ function aplicarTipo(){
   pintarEstados($('d_estado'), TIPO, $('d_estado').value);
   $('btnGuardar').textContent = ($('editId').value ? 'Actualizar ' : 'Guardar ') +
     (NOMBRE_TIPO[TIPO] || 'cotización').toLowerCase();
+  pintarRuta();
+  contarPagos();
   recalcular();
 }
 
@@ -755,6 +1010,37 @@ async function sugerirFolio(){
 function nuevaFila(item){
   const it = item || {producto:'', unidad:'Und', cantidad:1, precio:0};
   const tr = document.createElement('tr');
+  tr.draggable = false;
+
+  // Asa para reordenar arrastrando
+  const tdAsa = document.createElement('td');
+  tdAsa.className = 'asa'; tdAsa.textContent = '⠿'; tdAsa.title = 'Arrastra para reordenar';
+  tdAsa.addEventListener('mousedown', () => { tr.draggable = true; });
+  tdAsa.addEventListener('mouseup', () => { tr.draggable = false; });
+  tr.appendChild(tdAsa);
+
+  tr.addEventListener('dragstart', e => {
+    ARRASTRANDO = tr; tr.classList.add('arrastrando');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  tr.addEventListener('dragend', () => {
+    tr.classList.remove('arrastrando'); tr.draggable = false; ARRASTRANDO = null;
+    document.querySelectorAll('#items tr').forEach(f => f.classList.remove('destino'));
+  });
+  tr.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (ARRASTRANDO && ARRASTRANDO !== tr) tr.classList.add('destino');
+  });
+  tr.addEventListener('dragleave', () => tr.classList.remove('destino'));
+  tr.addEventListener('drop', e => {
+    e.preventDefault();
+    tr.classList.remove('destino');
+    if (!ARRASTRANDO || ARRASTRANDO === tr) return;
+    const filas = Array.from($('items').children);
+    const origen = filas.indexOf(ARRASTRANDO), destino = filas.indexOf(tr);
+    $('items').insertBefore(ARRASTRANDO, origen < destino ? tr.nextSibling : tr);
+    recalcular();
+  });
 
   const mk = (tipo, valor, clase, extra) => {
     const td = document.createElement('td');
@@ -856,7 +1142,15 @@ function recalcular(){
   $('f_iva').style.display = conIva ? 'flex' : 'none';
   $('lbl_iva').textContent = 'IVA (' + (pct || 0) + '%)';
   $('t_iva').textContent = money(iva, mon);
-  $('t_total').textContent = money(total, mon);
+  const elTotal = $('t_total');
+  const previo = elTotal.textContent;
+  elTotal.textContent = money(total, mon);
+  if (previo !== elTotal.textContent){
+    elTotal.classList.remove('pulso');
+    void elTotal.offsetWidth;          // reinicia la animación
+    elTotal.classList.add('pulso');
+    setTimeout(() => elTotal.classList.remove('pulso'), 220);
+  }
 
   const tasa = parseFloat($('d_tasa').value) || 0;
   $('t_bs').style.display = tasa > 0 ? 'block' : 'none';
@@ -957,6 +1251,7 @@ function nuevoPresupuesto(){
   aplicarTipo();
   $('btnCancelar').style.display = 'none';
   $('avisoEdicion').style.display = 'none';
+  pintarRuta();
   document.querySelectorAll('.mp-check').forEach(c => c.checked = c.dataset.activo === 'true');
   recalcular();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -1042,8 +1337,25 @@ async function editar(id){
 let temporizador;
 function buscarConRetardo(){ clearTimeout(temporizador); temporizador = setTimeout(() => { PAGINA = 1; cargarHistorial(); }, 350); }
 
+function esqueletoHistorial(){
+  const cuerpo = $('h_tbody');
+  cuerpo.innerHTML = '';
+  for (let i = 0; i < 4; i++){
+    const tr = document.createElement('tr');
+    for (let c = 0; c < 6; c++){
+      const td = document.createElement('td');
+      const d = document.createElement('div');
+      d.className = 'esqueleto';
+      d.style.width = [60, 70, 140, 80, 70, 120][c] + 'px';
+      td.appendChild(d); tr.appendChild(td);
+    }
+    cuerpo.appendChild(tr);
+  }
+}
+
 async function cargarHistorial(){
   const cuerpo = $('h_tbody');
+  esqueletoHistorial();
   try {
     const q = encodeURIComponent($('h_q').value.trim());
     const est = $('h_estado').value;
@@ -1442,6 +1754,7 @@ function pintarMetodosFormulario(){
     lab.appendChild(ch); lab.appendChild(div);
     cont.appendChild(lab);
   });
+  contarPagos();
 }
 
 function filaMetodoCfg(m){
@@ -1629,6 +1942,20 @@ async function iniciar(){
   $('f_moneda_captura').addEventListener('change', cambiarMonedaCaptura);
   $('cl_nombre').addEventListener('change', autocompletarCliente);
   $('cl_nombre').addEventListener('input', autocompletarCliente);
+
+  // Secciones plegables
+  document.querySelectorAll('.plegador').forEach(b => {
+    b.addEventListener('click', () => {
+      const destino = $(b.dataset.abre);
+      const abierto = destino.classList.toggle('abierto');
+      b.classList.toggle('abierto', abierto);
+    });
+  });
+  $('metodosLista').addEventListener('change', contarPagos);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); abrirCatalogo(); }
+  });
+
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's'){ e.preventDefault(); guardar(); }
     if (e.key === 'Escape'){ cerrarConfig(); cerrarCatalogo(); }
@@ -1651,6 +1978,7 @@ async function iniciar(){
   recalcular();
 }
 window.addEventListener('DOMContentLoaded', iniciar);
+
 </script>
 </body>
 </html>
