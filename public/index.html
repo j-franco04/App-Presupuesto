@@ -332,6 +332,30 @@ kbd{
 .aviso.ok{border-left-color:#2ECC71}
 .aviso.error{border-left-color:#E74C3C}
 
+/* Pestañas del archivo */
+.hist-tabs{display:flex; gap:3px; background:#E8E7E2; padding:3px; border-radius:9px}
+.hist-tab{
+  background:none; border:0; padding:7px 15px; border-radius:7px; cursor:pointer;
+  font-size:12.5px; font-weight:600; color:var(--gris); transition:var(--t); white-space:nowrap;
+}
+.hist-tab:hover{color:var(--tinta)}
+.hist-tab.activa{background:#fff; color:var(--negro); box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+/* Acciones de cada fila */
+.acc-sel{
+  padding:5px 26px 5px 9px; font-size:12px; border:1px solid var(--linea);
+  border-radius:var(--r-s); background-color:#fff; width:auto; min-width:110px;
+}
+.icono-btn{
+  width:30px; height:30px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--linea); background:#fff; border-radius:var(--r-s); cursor:pointer;
+  transition:var(--t); color:var(--gris);
+}
+.icono-btn:hover{background:#F6F5F2; color:var(--tinta); border-color:#D5D4CF}
+.icono-btn.peligro:hover{background:var(--rojo-luz); color:var(--rojo); border-color:#F0CCC6}
+.icono-btn svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.sep-acc{width:1px; height:20px; background:var(--linea); margin:0 3px}
+
 .vacio{text-align:center; color:var(--gris-2); padding:30px 20px; font-size:13px}
 .pista{font-size:12.5px; color:var(--gris); line-height:1.55}
 .aviso-iva{
@@ -651,14 +675,20 @@ kbd{
 <!-- ========== HISTORIAL ========== -->
 <section id="historial">
   <div class="hist-cab">
-    <h2>Archivo de documentos</h2>
+    <h2>Archivo</h2>
+    <div class="hist-tabs">
+      <button type="button" class="hist-tab" data-h="" onclick="filtrarArchivo('')">Todos</button>
+      <button type="button" class="hist-tab activa" data-h="cotizacion" onclick="filtrarArchivo('cotizacion')">Cotizaciones</button>
+      <button type="button" class="hist-tab" data-h="nota_entrega" onclick="filtrarArchivo('nota_entrega')">Notas de entrega</button>
+      <button type="button" class="hist-tab" data-h="factura" onclick="filtrarArchivo('factura')">Facturas</button>
+    </div>
     <div class="hist-herramientas">
       <div class="buscador-caja"><input id="h_q" placeholder="Cliente, RIF o folio…" autocomplete="off"></div>
-      <select id="h_tipo">
-        <option value="">Todos los documentos</option>
-        <option value="cotizacion">Solo cotizaciones</option>
-        <option value="nota_entrega">Solo notas de entrega</option>
-        <option value="factura">Solo facturas</option>
+      <select id="h_tipo" style="display:none">
+        <option value="">Todos</option>
+        <option value="cotizacion">Cotizaciones</option>
+        <option value="nota_entrega">Notas de entrega</option>
+        <option value="factura">Facturas</option>
       </select>
       <select id="h_estado">
         <option value="">Todos los estados</option>
@@ -933,7 +963,27 @@ function pintarEstados(select, tipo, valor){
   select.value = lista.some(e => e[0] === valor) ? valor : 'borrador';
 }
 
-function cambiarTipo(t){ TIPO = t; aplicarTipo(); }
+function cambiarTipo(t){
+  TIPO = t;
+  aplicarTipo();
+  // El archivo sigue al tipo que estás editando
+  if ($('h_tipo').value !== t){
+    $('h_tipo').value = t; PAGINA = 1;
+    marcarPestanaArchivo(); cargarHistorial();
+  }
+}
+
+function marcarPestanaArchivo(){
+  const v = $('h_tipo').value;
+  document.querySelectorAll('.hist-tab').forEach(b => b.classList.toggle('activa', b.dataset.h === v));
+}
+
+function filtrarArchivo(tipo){
+  $('h_tipo').value = tipo;
+  PAGINA = 1;
+  marcarPestanaArchivo();
+  cargarHistorial();
+}
 
 function contarPagos(){
   const n = document.querySelectorAll('.mp-check:checked').length;
@@ -1337,6 +1387,21 @@ async function editar(id){
 let temporizador;
 function buscarConRetardo(){ clearTimeout(temporizador); temporizador = setTimeout(() => { PAGINA = 1; cargarHistorial(); }, 350); }
 
+const ICONOS = {
+  editar: '<path d="M11.5 2.5l2 2L6 12l-2.8.8.8-2.8 7.5-7.5z"/><path d="M2 14.2h12"/>',
+  borrar: '<path d="M2.6 4.2h10.8"/><path d="M6 4.2V2.8h4v1.4"/><path d="M12.2 4.2l-.6 9.2H4.4l-.6-9.2"/><path d="M6.6 7v3.8M9.4 7v3.8"/>'
+};
+
+function botonIcono(clave, titulo, accion, peligro){
+  const b = document.createElement('button');
+  b.className = 'icono-btn' + (peligro ? ' peligro' : '');
+  b.title = titulo;
+  b.setAttribute('aria-label', titulo);
+  b.innerHTML = '<svg viewBox="0 0 16 16">' + ICONOS[clave] + '</svg>';
+  b.onclick = accion;
+  return b;
+}
+
 function esqueletoHistorial(){
   const cuerpo = $('h_tbody');
   cuerpo.innerHTML = '';
@@ -1367,7 +1432,11 @@ async function cargarHistorial(){
     if (!r.lista.length){
       const tr = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = 6; td.className = 'vacio'; td.textContent = 'No hay cotizaciones que coincidan.';
+      td.colSpan = 6; td.className = 'vacio';
+      const quePlural = {cotizacion:'cotizaciones', nota_entrega:'notas de entrega', factura:'facturas'};
+      td.textContent = $('h_q').value.trim()
+        ? 'Ningún documento coincide con la búsqueda.'
+        : 'Todavía no hay ' + (quePlural[$('h_tipo').value] || 'documentos') + '.';
       tr.appendChild(td); cuerpo.appendChild(tr);
     }
 
@@ -1382,10 +1451,12 @@ async function cargarHistorial(){
       const facturaFila = p.tipo === 'factura';
       const tdFolio = celda(p.numero || 'S/N');
       tdFolio.style.fontWeight = '700';
-      const sf = document.createElement('small');
-      sf.className = 'sub-folio';
-      sf.textContent = NOMBRE_TIPO[p.tipo] || 'Cotización';
-      tdFolio.appendChild(sf);
+      if (!$('h_tipo').value){          // solo en la vista "Todos" hace falta aclararlo
+        const sf = document.createElement('small');
+        sf.className = 'sub-folio';
+        sf.textContent = NOMBRE_TIPO[p.tipo] || 'Cotización';
+        tdFolio.appendChild(sf);
+      }
       celda(new Date(p.fecha).toLocaleDateString('es-VE'));
       const tdCli = celda((p.cliente && p.cliente.nombre) || 'Sin cliente');
       if (p.cliente && p.cliente.rif){
@@ -1404,29 +1475,51 @@ async function cargarHistorial(){
 
       const tdAcc = document.createElement('td');
       const grupo = document.createElement('div'); grupo.className = 'acc';
-      const boton = (txt, fn, clase) => {
-        const b = document.createElement('button');
-        b.className = 'btn btn-mini ' + (clase || ''); b.textContent = txt; b.onclick = fn;
-        grupo.appendChild(b);
-      };
-      boton('PDF', () => window.open(urlPDF(p._id), '_blank'));
-      boton('Editar', () => editar(p._id));
-      if (!notaFila && !facturaFila) boton('→ Nota', () => convertir(p._id, p.numero));
-      if (!facturaFila) boton('→ Factura', () => facturar(p._id, p.numero, p.moneda, p.tasa_bcv));
-      boton('Duplicar', () => duplicar(p._id));
-      boton('Borrar', () => borrar(p._id, p.numero), 'btn-rojo');
+      // Ver el PDF
+      const bVer = document.createElement('button');
+      bVer.className = 'btn btn-mini';
+      bVer.textContent = 'Ver';
+      bVer.onclick = () => window.open(urlPDF(p._id), '_blank');
+      grupo.appendChild(bVer);
 
+      // Estado
       const sel = document.createElement('select');
-      sel.className = 'btn-mini'; sel.style.cssText = 'width:auto;padding:4px';
+      sel.className = 'acc-sel';
       pintarEstados(sel, p.tipo || 'cotizacion', p.estado || 'borrador');
       sel.onchange = () => cambiarEstado(p._id, sel.value);
       grupo.appendChild(sel);
+
+      // Convertir: una sola lista con los destinos posibles
+      const conv = document.createElement('select');
+      conv.className = 'acc-sel';
+      const destinos = [['', 'Convertir en…']];
+      if (!notaFila && !facturaFila) destinos.push(['nota', 'Nota de entrega']);
+      if (!facturaFila) destinos.push(['factura', 'Factura']);
+      destinos.push(['copia', 'Copia de este documento']);
+      destinos.forEach(([v, t]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = t; conv.appendChild(o);
+      });
+      conv.onchange = () => {
+        const destino = conv.value;
+        conv.value = '';
+        if (destino === 'nota') convertir(p._id, p.numero);
+        else if (destino === 'factura') facturar(p._id, p.numero, p.moneda, p.tasa_bcv);
+        else if (destino === 'copia') duplicar(p._id);
+      };
+      grupo.appendChild(conv);
+
+      const sep = document.createElement('i'); sep.className = 'sep-acc';
+      grupo.appendChild(sep);
+      grupo.appendChild(botonIcono('editar', 'Editar', () => editar(p._id)));
+      grupo.appendChild(botonIcono('borrar', 'Eliminar', () => borrar(p._id, p.numero), true));
 
       tdAcc.appendChild(grupo); tr.appendChild(tdAcc);
       cuerpo.appendChild(tr);
     });
 
-    $('h_info').textContent = `Página ${r.pagina} de ${r.paginas} · ${r.totalDocs} cotizaciones`;
+    const nombrePlural = {cotizacion:'cotizaciones', nota_entrega:'notas de entrega', factura:'facturas'};
+    $('h_info').textContent = `Página ${r.pagina} de ${r.paginas} · ${r.totalDocs} ` +
+      (nombrePlural[$('h_tipo').value] || 'documentos');
     $('h_prev').disabled = r.pagina <= 1;
     $('h_next').disabled = r.pagina >= r.paginas;
     conexion(true, 'Conectado');
@@ -1936,7 +2029,8 @@ async function iniciar(){
   });
   $('h_q').addEventListener('input', buscarConRetardo);
   $('h_estado').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
-  $('h_tipo').addEventListener('change', () => { PAGINA = 1; cargarHistorial(); });
+  $('h_tipo').value = TIPO;
+  marcarPestanaArchivo();
   $('buscaProd').addEventListener('input', e => pintarBuscador(e.target.value));
   ['f_exento','f_ajustes','f_tasa_usada'].forEach(id => $(id).addEventListener('input', recalcular));
   $('f_moneda_captura').addEventListener('change', cambiarMonedaCaptura);

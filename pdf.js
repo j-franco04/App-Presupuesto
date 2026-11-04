@@ -50,12 +50,11 @@ function nombreMoneda(m) {
     if (m === 'Bs' || m === 'Bs.') return 'Bolívares';
     return 'Dólares';
 }
-function rutaLogo() {
-    const posibles = [
-        path.join(__dirname, 'public', 'NLOGO.png'),
-        path.join(__dirname, 'NLOGO.png')
-    ];
-    return posibles.find(p => fs.existsSync(p)) || null;
+function rutaLogo() { return buscarImagen('NLOGO.png'); }
+
+function buscarImagen(nombre) {
+    return [path.join(__dirname, 'public', nombre), path.join(__dirname, nombre)]
+        .find(p => fs.existsSync(p)) || null;
 }
 
 /* ---------- Bloques del documento ---------- */
@@ -311,19 +310,41 @@ function pieDocumento(doc, p, y) {
     return yy + altoPagos;
 }
 
-const ALTO_FIRMAS = 54;
+const ALTO_FIRMAS = 76;
 
 function dibujarFirmas(doc, y) {
     const ancho = 240;
 
+    /* Firma y sello sobre la línea de "Entregado por".
+       El sello va ligeramente rotado y montado sobre la firma,
+       como queda al estamparlo a mano. */
+    const firma = buscarImagen('firma.png');
+    const sello = buscarImagen('sello.png');
+    const baseY = y + 54;                 // línea donde se firma
+
+    if (firma) {
+        try { doc.image(firma, M + 26, baseY - 50, { fit: [108, 44] }); }
+        catch (err) { /* imagen ilegible */ }
+    }
+    if (sello) {
+        try {
+            doc.save();
+            doc.rotate(-5, { origin: [M + 150, baseY - 26] });
+            doc.opacity(0.9);
+            doc.image(sello, M + 96, baseY - 44, { fit: [138, 38] });
+            doc.opacity(1);
+            doc.restore();
+        } catch (err) { /* imagen ilegible */ }
+    }
+
     [['ENTREGADO POR', 'AB TECHNOLOGY BY, C.A.'], ['RECIBIDO CONFORME', 'Nombre, C.I. y fecha']]
         .forEach((par, i) => {
             const x = M + i * 292;
-            doc.moveTo(x, y + 32).lineTo(x + ancho, y + 32).lineWidth(0.7).strokeColor('#9A9A94').stroke();
+            doc.moveTo(x, baseY).lineTo(x + ancho, baseY).lineWidth(0.7).strokeColor('#9A9A94').stroke();
             doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(7.5)
-                .text(par[0], x, y + 37, { width: ancho, align: 'center' });
+                .text(par[0], x, baseY + 5, { width: ancho, align: 'center' });
             doc.fillColor(GRIS).font('Helvetica').fontSize(6.8)
-                .text(par[1], x, y + 47, { width: ancho, align: 'center' });
+                .text(par[1], x, baseY + 15, { width: ancho, align: 'center' });
         });
 }
 
