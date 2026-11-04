@@ -46,6 +46,19 @@ Escribe el total **con IVA incluido** y la alícuota: el sistema despeja la base
 
 Para notas de crédito y débito aparece un campo extra donde indicas qué factura afectan.
 
+### Facturas que llegan tarde
+
+La compra tiene **dos fechas distintas** y es importante no confundirlas:
+
+- **Fecha de la factura:** la que trae impresa el documento del proveedor. Es la que sale en el libro, porque así lo exige el reglamento.
+- **Período en que la declaro:** el mes en cuyo libro quieres que aparezca.
+
+Normalmente coinciden. Pero si una factura de agosto te llega en noviembre, pones la fecha de agosto y el período en noviembre: así el crédito fiscal se aprovecha en el mes que estás declarando, sin alterar la fecha real del documento.
+
+El sistema te avisa cuando las dos no coinciden, marca esas filas en el libro con la nota "de otro mes", y las cuenta en el encabezado. En el CSV queda una columna para identificarlas.
+
+**Límite:** la factura y el período deben ser del mismo año. Si intentas declarar en 2026 una factura de 2025 el sistema no lo permite.
+
 ---
 
 ## 5. Retenciones que te practican

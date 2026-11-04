@@ -208,7 +208,14 @@ const ConfigSchema = new mongoose.Schema({
    Artículo 75 del Reglamento de la Ley del IVA.
    --------------------------------------------------------------- */
 const CompraSchema = new mongoose.Schema({
+    // Fecha de emisión de la factura del proveedor (va impresa en el libro)
     fecha:          { type: Date, required: true, index: true },
+
+    /* Período en el que se declara. Normalmente coincide con el mes de la
+       factura, pero una factura que llega tarde se registra en el período
+       en curso: por eso van separados. */
+    periodo_anio:   { type: Number, index: true },
+    periodo_mes:    { type: Number, index: true },
     tipo_documento: { type: String, enum: ['factura', 'nota_credito', 'nota_debito', 'importacion'], default: 'factura' },
     numero_factura: { type: String, default: '' },
     numero_control: { type: String, default: '' },

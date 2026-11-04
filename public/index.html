@@ -856,7 +856,7 @@ kbd{
     <div class="modal-cuerpo">
       <input type="hidden" id="cp_id">
       <div class="rejilla c4">
-        <div><label class="campo">Fecha</label><input id="cp_fecha" type="date"></div>
+        <div><label class="campo">Fecha de la factura</label><input id="cp_fecha" type="date"></div>
         <div><label class="campo">Tipo de documento</label>
           <select id="cp_tipo">
             <option value="factura">Factura</option>
@@ -870,6 +870,20 @@ kbd{
       <div class="rejilla c2" style="margin-top:14px">
         <div><label class="campo">Proveedor</label><input id="cp_prov" placeholder="Razón social"></div>
         <div><label class="campo">RIF del proveedor</label><input id="cp_rif" placeholder="J-12345678-9"></div>
+      </div>
+
+      <div class="rejilla c4" style="margin-top:14px; align-items:end">
+        <div>
+          <label class="campo">Declarar en el período</label>
+          <select id="cp_pmes"></select>
+        </div>
+        <div>
+          <label class="campo">Año del período</label>
+          <select id="cp_panio"></select>
+        </div>
+        <div style="grid-column:span 2">
+          <div id="cp_aviso_periodo" class="pista"></div>
+        </div>
       </div>
       <div id="cp_afectado_caja" style="display:none; margin-top:14px">
         <label class="campo">Documento que afecta</label>
@@ -2339,11 +2353,14 @@ function pintarLibroVentas(d){
 }
 
 function pintarLibroCompras(d){
+  const extem = d.filas.filter(f => f.extemporanea).length;
   $('avisoLibro').innerHTML =
     'Registra aquí las facturas que te dan tus proveedores. Las <b>notas de crédito</b> se restan ' +
-    'automáticamente del crédito fiscal del mes.';
+    'automáticamente del crédito fiscal del período.' +
+    (extem ? ` <b>${extem} ${extem === 1 ? 'factura es' : 'facturas son'} de meses anteriores</b> y ` +
+             'se están declarando en este período; aparecen marcadas.' : '');
 
-  encabezados([['Fecha'],['Tipo'],['N° Factura'],['N° Control'],['Proveedor'],['RIF'],
+  encabezados([['Fecha factura'],['Tipo'],['N° Factura'],['N° Control'],['Proveedor'],['RIF'],
                ['Total compras','d'],['Exentas','d'],['Base imponible','d'],['%','d'],
                ['Crédito fiscal','d'],['Comprobante'],['']]);
 
@@ -2359,7 +2376,15 @@ function pintarLibroCompras(d){
   d.filas.forEach(f => {
     const tr = document.createElement('tr');
     if (f.tipo_documento === 'nota_credito') tr.className = 'credito';
-    [fechaCorta(f.fecha), nombreTipo[f.tipo_documento] || f.tipo_documento,
+    const tdFecha = celda(fechaCorta(f.fecha));
+    if (f.extemporanea){
+      const et = document.createElement('small');
+      et.className = 'sub-folio';
+      et.textContent = 'de otro mes';
+      tdFecha.appendChild(et);
+    }
+    tr.appendChild(tdFecha);
+    [nombreTipo[f.tipo_documento] || f.tipo_documento,
      f.numero_factura, f.numero_control, f.proveedor, f.rif].forEach(v => tr.appendChild(celda(v)));
     [f.total, f.exento, f.base_imponible].forEach(v => tr.appendChild(celda(nf(v), 'd')));
     tr.appendChild(celda(f.alicuota ? f.alicuota + '%' : '', 'd'));
@@ -2492,13 +2517,13 @@ function exportarLibro(){
     filas.push(['TOTALES','','','','', t.total, t.exento, t.base_imponible, '', t.debito_fiscal,
                 t.iva_retenido, '', '', t.islr_retenido, '', '']);
   } else {
-    filas.push(['Fecha','Tipo','N Factura','N Control','Proveedor','RIF','Total compras','Exentas',
-                'Base imponible','Alicuota','Credito fiscal','Comprobante']);
+    filas.push(['Fecha factura','Tipo','N Factura','N Control','Proveedor','RIF','Total compras','Exentas',
+                'Base imponible','Alicuota','Credito fiscal','Comprobante','De otro mes']);
     DATOS_LIBRO.filas.forEach(f => filas.push([fechaCorta(f.fecha), f.tipo_documento, f.numero_factura,
       f.numero_control, f.proveedor, f.rif, f.total, f.exento, f.base_imponible, f.alicuota,
-      f.credito_fiscal, f.comprobante_retencion]));
+      f.credito_fiscal, f.comprobante_retencion, f.extemporanea ? 'Si' : '']));
     const t = DATOS_LIBRO.totales;
-    filas.push(['TOTALES','','','','','', t.total, t.exento, t.base_imponible, '', t.credito_fiscal, '']);
+    filas.push(['TOTALES','','','','','', t.total, t.exento, t.base_imponible, '', t.credito_fiscal, '', '']);
   }
 
   // Punto y coma: así Excel en español separa bien las columnas
@@ -2512,6 +2537,38 @@ function exportarLibro(){
 }
 
 /* ---------- Registro de compras ---------- */
+function prepararPeriodoCompra(){
+  const mes = $('cp_pmes'), anio = $('cp_panio');
+  if (mes.options.length) return;
+  MESES.forEach((m, i) => { const o = document.createElement('option'); o.value = i+1; o.textContent = m; mes.appendChild(o); });
+  const hoy = new Date();
+  for (let a = hoy.getFullYear() + 1; a >= hoy.getFullYear() - 4; a--){
+    const o = document.createElement('option'); o.value = a; o.textContent = a; anio.appendChild(o);
+  }
+  mes.onchange = anio.onchange = avisarPeriodo;
+  $('cp_fecha').addEventListener('change', avisarPeriodo);
+}
+
+/** Avisa cuando la factura es de un mes distinto al período declarado. */
+function avisarPeriodo(){
+  const f = $('cp_fecha').value;
+  const el = $('cp_aviso_periodo');
+  if (!f){ el.textContent = ''; return; }
+
+  const [a, m] = f.split('-').map(Number);
+  const pa = +$('cp_panio').value, pm = +$('cp_pmes').value;
+
+  if (a !== pa){
+    el.innerHTML = '<b style="color:var(--rojo)">La factura es de ' + a + ' y el período de ' + pa +
+      '. El crédito fiscal debe quedar dentro del mismo año.</b>';
+  } else if (m !== pm){
+    el.innerHTML = 'Factura de <b>' + MESES[m-1] + '</b> que vas a declarar en <b>' + MESES[pm-1] +
+      '</b>. Correcto si te llegó tarde; quedará marcada en el libro.';
+  } else {
+    el.textContent = 'La factura y el período coinciden.';
+  }
+}
+
 function calcularCompra(){
   const total = parseFloat($('cp_total').value) || 0;
   const exento = Math.min(parseFloat($('cp_exento').value) || 0, total);
@@ -2528,6 +2585,10 @@ async function abrirCompra(id){
   ['cp_numero','cp_control','cp_prov','cp_rif','cp_afectado','cp_comprobante','cp_obs'].forEach(i => $(i).value = '');
   $('cp_total').value = 0; $('cp_exento').value = 0; $('cp_alicuota').value = 16; $('cp_retenido').value = 0;
   $('cp_tipo').value = 'factura';
+  prepararPeriodoCompra();
+  // El período arranca en el mes que estás viendo en el libro
+  $('cp_pmes').value = $('lb_mes').value;
+  $('cp_panio').value = $('lb_anio').value;
   $('cp_id').value = id || '';
   $('cp_borrar').style.display = id ? 'inline-flex' : 'none';
   $('tituloCompra').textContent = id ? 'Editar compra' : 'Registrar compra';
@@ -2536,6 +2597,8 @@ async function abrirCompra(id){
     const f = DATOS_LIBRO.filas.find(x => String(x.id) === String(id));
     if (f){
       $('cp_fecha').value = new Date(f.fecha).toISOString().slice(0,10);
+      $('cp_pmes').value = f.periodo_mes;
+      $('cp_panio').value = f.periodo_anio;
       $('cp_tipo').value = f.tipo_documento;
       $('cp_numero').value = f.numero_factura;
       $('cp_control').value = f.numero_control;
@@ -2554,6 +2617,7 @@ async function abrirCompra(id){
   }
 
   calcularCompra();
+  avisarPeriodo();
   $('modalCompra').classList.add('abierto');
 }
 function cerrarCompra(){ $('modalCompra').classList.remove('abierto'); }
@@ -2562,6 +2626,8 @@ async function guardarCompra(){
   const id = $('cp_id').value;
   const datos = {
     fecha: $('cp_fecha').value,
+    periodo_anio: +$('cp_panio').value,
+    periodo_mes: +$('cp_pmes').value,
     tipo_documento: $('cp_tipo').value,
     numero_factura: $('cp_numero').value.trim(),
     numero_control: $('cp_control').value.trim(),

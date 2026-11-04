@@ -904,6 +904,16 @@ api.get('/clientes', async (req, res, next) => {
    COMPRAS (alimentan el libro de compras)
    ========================================================= */
 function normalizarCompra(b) {
+    const fecha = parseFecha(b.fecha);
+
+    // Si no se indica período, se usa el mes de la factura
+    let pAnio = parseInt(b.periodo_anio, 10);
+    let pMes = parseInt(b.periodo_mes, 10);
+    if (!pAnio || !pMes || pMes < 1 || pMes > 12) {
+        pAnio = fecha.getUTCFullYear();
+        pMes = fecha.getUTCMonth() + 1;
+    }
+
     const total = r2(num(b.total));
     const exento = r2(Math.min(Math.max(0, num(b.exento)), total));
     const alicuota = Math.max(0, Math.min(100, num(b.alicuota ?? 16)));
@@ -916,7 +926,9 @@ function normalizarCompra(b) {
     const credito = r2(num(b.credito_fiscal) || base * alicuota / 100);
 
     return {
-        fecha: parseFecha(b.fecha),
+        fecha,
+        periodo_anio: pAnio,
+        periodo_mes: pMes,
         tipo_documento: ['factura', 'nota_credito', 'nota_debito', 'importacion'].includes(b.tipo_documento)
             ? b.tipo_documento : 'factura',
         numero_factura: txt(b.numero_factura, 40),
@@ -955,6 +967,14 @@ api.post('/compras', async (req, res, next) => {
         const datos = normalizarCompra(req.body);
         if (!datos.proveedor.nombre) return res.status(400).json({ error: 'Escribe el nombre del proveedor.' });
         if (!datos.numero_factura) return res.status(400).json({ error: 'Escribe el número de la factura del proveedor.' });
+
+        const anioFactura = datos.fecha.getUTCFullYear();
+        if (anioFactura !== datos.periodo_anio) {
+            return res.status(400).json({
+                error: `La factura es del año ${anioFactura} y la estás declarando en ${datos.periodo_anio}. ` +
+                       'El crédito fiscal debe quedar dentro del mismo ejercicio.'
+            });
+        }
         res.status(201).json(await Compra.create(datos));
     } catch (e) { next(e); }
 });
@@ -1050,8 +1070,13 @@ async function libroCompras(anio, mes) {
     {
         const { desde, hasta } = rangoMes(anio, mes);
 
-        const compras = await Compra.find({ fecha: { $gte: desde, $lt: hasta } })
-            .sort({ fecha: 1, numero_factura: 1 }).lean();
+        const compras = await Compra.find({
+            $or: [
+                { periodo_anio: +anio, periodo_mes: +mes },
+                // Compatibilidad con registros anteriores, que no tenían período
+                { periodo_anio: { $exists: false }, fecha: { $gte: desde, $lt: hasta } }
+            ]
+        }).sort({ fecha: 1, numero_factura: 1 }).lean();
 
         // Las notas de crédito restan del crédito fiscal del período
         const filas = compras.map(c => {
@@ -1059,6 +1084,12 @@ async function libroCompras(anio, mes) {
             return {
                 id: c._id,
                 fecha: c.fecha,
+                periodo_anio: c.periodo_anio || new Date(c.fecha).getUTCFullYear(),
+                periodo_mes: c.periodo_mes || (new Date(c.fecha).getUTCMonth() + 1),
+                // Factura de un mes anterior declarada en este período
+                extemporanea: !!(c.periodo_anio && (
+                    new Date(c.fecha).getUTCFullYear() !== c.periodo_anio ||
+                    new Date(c.fecha).getUTCMonth() + 1 !== c.periodo_mes)),
                 tipo_documento: c.tipo_documento,
                 numero_factura: c.numero_factura,
                 numero_control: c.numero_control,
